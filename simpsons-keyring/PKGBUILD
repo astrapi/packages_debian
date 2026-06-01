@@ -1,0 +1,41 @@
+# Maintainer: astrapi <astrapi@example.com>
+pkgname=simpsons-keyring
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Simpsons CA-Zertifikat – ermöglicht HTTPS-Verbindungen zu internen Diensten"
+arch=('all')
+distribution=bookworm
+depends=('ca-certificates')
+makedepends=()
+source=('simpsons-ca.crt')
+
+package() {
+    # Prüfen ob das CA-Zertifikat vorhanden und kein Platzhalter ist
+    if ! grep -q "BEGIN CERTIFICATE" simpsons-ca.crt 2>/dev/null; then
+        echo "FEHLER: simpsons-ca.crt fehlt oder ist kein gültiges PEM-Zertifikat."
+        echo ""
+        echo "OPNsense → System → Trust → Authorities → eigene CA → Export (PEM)"
+        echo "Datei als 'simpsons-ca.crt' neben diesem PKGBUILD ablegen."
+        exit 1
+    fi
+
+    # CA-Zertifikat installieren
+    install -dm755 "$pkgdir/usr/local/share/ca-certificates"
+    install -m644 simpsons-ca.crt "$pkgdir/usr/local/share/ca-certificates/simpsons-ca.crt"
+
+    # postinst: Zertifikat-Datenbank nach Installation aktualisieren
+    cat > "$pkgdir/DEBIAN/postinst" << 'EOF'
+#!/bin/sh
+set -e
+update-ca-certificates
+EOF
+    chmod 755 "$pkgdir/DEBIAN/postinst"
+
+    # postrm: Zertifikat-Datenbank nach Deinstallation aktualisieren
+    cat > "$pkgdir/DEBIAN/postrm" << 'EOF'
+#!/bin/sh
+set -e
+update-ca-certificates
+EOF
+    chmod 755 "$pkgdir/DEBIAN/postrm"
+}
