@@ -12,8 +12,8 @@
   {
     "name": "simpsons-keyring",
     "pkgver": "1.0.0",
-    "pkgrel": "1",
-    "pkgdesc": "Simpsons CA-Zertifikat – ermöglicht HTTPS-Verbindungen zu internen Diensten",
+    "pkgrel": "2",
+    "pkgdesc": "Simpsons CA-Zertifikat und APT-Signierschlüssel für interne Dienste",
     "arch": "all",
     "distribution": "trixie",
     "subdir": "simpsons-keyring",
