@@ -1,0 +1,26 @@
+# Maintainer: astrapi <astrapi@example.com>
+pkgname=helloworld
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Hallo Welt! – Erstes Debian-Beispielpaket"
+arch=('all')
+distribution=bookworm
+depends=()
+makedepends=()
+source=()
+
+package() {
+    install -dm755 "$pkgdir/usr/bin"
+    cat > "$pkgdir/usr/bin/helloworld" << 'EOF'
+#!/bin/sh
+echo "Hallo Welt!"
+EOF
+    chmod +x "$pkgdir/usr/bin/helloworld"
+
+    install -dm755 "$pkgdir/usr/share/doc/helloworld"
+    cat > "$pkgdir/usr/share/doc/helloworld/copyright" << 'EOF'
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: helloworld
+License: MIT
+EOF
+}
