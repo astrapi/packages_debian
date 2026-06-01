@@ -15,7 +15,7 @@
     "pkgrel": "1",
     "pkgdesc": "Simpsons CA-Zertifikat – ermöglicht HTTPS-Verbindungen zu internen Diensten",
     "arch": "all",
-    "distribution": "bookworm",
+    "distribution": "trixie",
     "subdir": "simpsons-keyring",
     "git_url": "https://github.com/astrapi/packages_debian.git"
   }
