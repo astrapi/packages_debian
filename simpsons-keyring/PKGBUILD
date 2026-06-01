@@ -1,13 +1,13 @@
 # Maintainer: astrapi <astrapi@example.com>
 pkgname=simpsons-keyring
 pkgver=1.0.0
-pkgrel=1
-pkgdesc="Simpsons CA-Zertifikat – ermöglicht HTTPS-Verbindungen zu internen Diensten"
+pkgrel=2
+pkgdesc="Simpsons CA-Zertifikat und APT-Signierschlüssel für interne Dienste"
 arch=('all')
 distribution=trixie
 depends=('ca-certificates')
 makedepends=()
-source=('simpsons-ca.crt')
+source=('simpsons-ca.crt' 'simpsons-packages.asc')
 
 package() {
     # Prüfen ob das CA-Zertifikat vorhanden und kein Platzhalter ist
@@ -22,6 +22,13 @@ package() {
     # CA-Zertifikat installieren
     install -dm755 "$pkgdir/usr/local/share/ca-certificates"
     install -m644 simpsons-ca.crt "$pkgdir/usr/local/share/ca-certificates/simpsons-ca.crt"
+
+    # APT-Signierschlüssel installieren (falls vorhanden)
+    if grep -q "BEGIN PGP PUBLIC KEY BLOCK" simpsons-packages.asc 2>/dev/null; then
+        install -dm755 "$pkgdir/usr/share/keyrings"
+        gpg --dearmor < simpsons-packages.asc > "$pkgdir/usr/share/keyrings/simpsons-packages.gpg"
+        chmod 644 "$pkgdir/usr/share/keyrings/simpsons-packages.gpg"
+    fi
 
     # postinst: Zertifikat-Datenbank nach Installation aktualisieren
     cat > "$pkgdir/DEBIAN/postinst" << 'EOF'
