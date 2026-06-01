@@ -8,5 +8,15 @@
     "distribution": "bookworm",
     "subdir": "helloworld",
     "git_url": "https://github.com/astrapi/packages_debian.git"
+  },
+  {
+    "name": "simpsons-keyring",
+    "pkgver": "1.0.0",
+    "pkgrel": "1",
+    "pkgdesc": "Simpsons CA-Zertifikat – ermöglicht HTTPS-Verbindungen zu internen Diensten",
+    "arch": "all",
+    "distribution": "bookworm",
+    "subdir": "simpsons-keyring",
+    "git_url": "https://github.com/astrapi/packages_debian.git"
   }
 ]
