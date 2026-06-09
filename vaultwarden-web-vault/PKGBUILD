@@ -1,10 +1,10 @@
 # Maintainer: Michael Otto <michael@astrapi.de>
 pkgname=vaultwarden-web-vault
 pkgver=2026.4.1
-pkgrel=1
+pkgrel=2
 pkgdesc="Web vault frontend for vaultwarden server"
 arch=('all')
-distribution=bookworm
+distribution=trixie
 depends=()
 makedepends=('curl')
 source=()
