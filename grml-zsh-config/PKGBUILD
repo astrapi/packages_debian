@@ -10,23 +10,30 @@ distribution=trixie
 url='https://grml.org/zsh/'
 license=('GPL-2')
 depends=('zsh' 'coreutils' 'grep' 'sed' 'procps')
-makedepends=('asciidoctor')
-source=("https://github.com/grml/grml-etc-core/archive/refs/tags/v${pkgver}.tar.gz")
-sha256sums=('79a1cba5a7232ff14b03a3ce9aeb8d42e060a0c3f6387ca799574b37b6fc400c')
+makedepends=('curl' 'asciidoctor')
+source=()
 
-build() {
-    cd "grml-etc-core-${pkgver}/doc"
-    make
-}
+_sha256="79a1cba5a7232ff14b03a3ce9aeb8d42e060a0c3f6387ca799574b37b6fc400c"
+_tarball="grml-etc-core-${pkgver}.tar.gz"
+_url="https://github.com/grml/grml-etc-core/archive/refs/tags/v${pkgver}.tar.gz"
 
 package() {
-    cd "grml-etc-core-${pkgver}"
+    # Quelle herunterladen und prüfen
+    curl -fSL -o "/tmp/${_tarball}" "${_url}"
+    echo "${_sha256}  /tmp/${_tarball}" | sha256sum -c -
 
-    install -D -m644 etc/skel/.zshrc   "${pkgdir}/etc/skel/.zshrc"
-    install -D -m644 etc/zsh/keephack  "${pkgdir}/etc/zsh/keephack"
-    install -D -m644 etc/zsh/zshrc     "${pkgdir}/etc/zsh/zshrc"
+    tar -xzf "/tmp/${_tarball}" -C /tmp/
 
-    install -D -m644 doc/grmlzshrc.5   "${pkgdir}/usr/share/man/man5/grmlzshrc.5"
+    # Man-Page bauen
+    (cd "/tmp/grml-etc-core-${pkgver}/doc" && make)
+
+    cd "/tmp/grml-etc-core-${pkgver}"
+
+    install -D -m644 etc/skel/.zshrc  "${pkgdir}/etc/skel/.zshrc"
+    install -D -m644 etc/zsh/keephack "${pkgdir}/etc/zsh/keephack"
+    install -D -m644 etc/zsh/zshrc    "${pkgdir}/etc/zsh/zshrc"
+
+    install -D -m644 doc/grmlzshrc.5  "${pkgdir}/usr/share/man/man5/grmlzshrc.5"
     ln -sf grmlzshrc.5.gz "${pkgdir}/usr/share/man/man5/grml-zsh-config.5.gz"
 
     install -dm755 "${pkgdir}/usr/share/doc/${pkgname}"
