@@ -25,7 +25,7 @@ package() {
     tar -xzf "/tmp/${_tarball}" -C /tmp/
 
     # Build-Abhängigkeit sicherstellen und Man-Page bauen
-    apt-get install -y --no-install-recommends asciidoctor
+    sudo apt-get install -y --no-install-recommends asciidoctor
     (cd "/tmp/grml-etc-core-${pkgver}/doc" && make)
 
     cd "/tmp/grml-etc-core-${pkgver}"
