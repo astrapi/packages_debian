@@ -10,7 +10,7 @@ distribution=trixie
 url='https://grml.org/zsh/'
 license=('GPL-2')
 depends=('zsh' 'coreutils' 'grep' 'sed' 'procps')
-makedepends=('curl' 'asciidoctor')
+makedepends=('curl')
 source=()
 
 _sha256="79a1cba5a7232ff14b03a3ce9aeb8d42e060a0c3f6387ca799574b37b6fc400c"
@@ -24,18 +24,11 @@ package() {
 
     tar -xzf "/tmp/${_tarball}" -C /tmp/
 
-    # Build-Abhängigkeit sicherstellen und Man-Page bauen
-    sudo apt-get install -y --no-install-recommends asciidoctor
-    (cd "/tmp/grml-etc-core-${pkgver}/doc" && make)
-
     cd "/tmp/grml-etc-core-${pkgver}"
 
     install -D -m644 etc/skel/.zshrc  "${pkgdir}/etc/skel/.zshrc"
     install -D -m644 etc/zsh/keephack "${pkgdir}/etc/zsh/keephack"
     install -D -m644 etc/zsh/zshrc    "${pkgdir}/etc/zsh/zshrc"
-
-    install -D -m644 doc/grmlzshrc.5  "${pkgdir}/usr/share/man/man5/grmlzshrc.5"
-    ln -sf grmlzshrc.5.gz "${pkgdir}/usr/share/man/man5/grml-zsh-config.5.gz"
 
     install -dm755 "${pkgdir}/usr/share/doc/${pkgname}"
     cat > "${pkgdir}/usr/share/doc/${pkgname}/copyright" << 'EOF'
