@@ -1,0 +1,47 @@
+# Maintainer: astrapi <astrapi@example.com>
+# Upstream:   Pierre Schmitz <pierre@archlinux.de>
+
+pkgname=grml-zsh-config
+pkgver=0.19.28
+pkgrel=1
+pkgdesc="grml's zsh setup"
+arch=('all')
+distribution=trixie
+url='https://grml.org/zsh/'
+license=('GPL-2')
+depends=('zsh' 'coreutils' 'grep' 'sed' 'procps')
+makedepends=('asciidoctor')
+source=("https://github.com/grml/grml-etc-core/archive/refs/tags/v${pkgver}.tar.gz")
+sha256sums=('79a1cba5a7232ff14b03a3ce9aeb8d42e060a0c3f6387ca799574b37b6fc400c')
+
+build() {
+    cd "grml-etc-core-${pkgver}/doc"
+    make
+}
+
+package() {
+    cd "grml-etc-core-${pkgver}"
+
+    install -D -m644 etc/skel/.zshrc   "${pkgdir}/etc/skel/.zshrc"
+    install -D -m644 etc/zsh/keephack  "${pkgdir}/etc/zsh/keephack"
+    install -D -m644 etc/zsh/zshrc     "${pkgdir}/etc/zsh/zshrc"
+
+    install -D -m644 doc/grmlzshrc.5   "${pkgdir}/usr/share/man/man5/grmlzshrc.5"
+    ln -sf grmlzshrc.5.gz "${pkgdir}/usr/share/man/man5/grml-zsh-config.5.gz"
+
+    install -dm755 "${pkgdir}/usr/share/doc/${pkgname}"
+    cat > "${pkgdir}/usr/share/doc/${pkgname}/copyright" << 'EOF'
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: grml-etc-core
+Upstream-Contact: Michael Prokop <mika@grml.org>
+Source: https://github.com/grml/grml-etc-core
+
+License: GPL-2
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; version 2 of the License.
+ .
+ On Debian systems, the full text of the GNU General Public License
+ version 2 can be found in /usr/share/common-licenses/GPL-2.
+EOF
+}
