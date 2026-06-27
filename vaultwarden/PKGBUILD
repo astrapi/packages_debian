@@ -1,0 +1,53 @@
+# Maintainer: Michael Otto <michael@astrapi.de>
+pkgname=vaultwarden
+pkgver=1.36.0  
+pkgrel=1
+pkgdesc="An alternative Bitwarden server API implementation written in Rust"
+arch=('amd64' 'arm64') # Hier die Architekturen eintragen, auf denen du baust
+distribution=trixie
+depends=('libssl3' 'libsqlite3-0' 'vaultwarden-web-vault') # Erzwingt dein Web-Vault Paket
+makedepends=('cargo' 'rustc' 'pkg-config' 'libssl-dev' 'libsqlite3-dev')
+source=("https://github.com/dani-garcia/vaultwarden/archive/refs/tags/${pkgver}.tar.gz")
+
+build() {
+    cd "${srcdir}/vaultwarden-${pkgver}"
+    cargo build --features sqlite --release
+}
+
+package() {
+    cd "${srcdir}/vaultwarden-${pkgver}"
+
+    install -Dm755 "target/release/vaultwarden" "${pkgdir}/usr/bin/vaultwarden"
+
+    install -Dm640 /dev/null "${pkgdir}/etc/vaultwarden.env"
+    cat <<EOF > "${pkgdir}/etc/vaultwarden.env"
+# Vaultwarden Konfiguration für Debian
+DATA_FOLDER=/var/lib/vaultwarden
+WEB_VAULT_FOLDER=/usr/share/vaultwarden/web-vault
+WEB_VAULT_ENABLED=true
+ROCKET_ADDRESS=127.0.0.1
+ROCKET_PORT=8000
+EOF
+
+    install -Dm644 /dev/null "${pkgdir}/usr/lib/systemd/system/vaultwarden.service"
+    cat <<EOF > "${pkgdir}/usr/lib/systemd/system/vaultwarden.service"
+[Unit]
+Description=Vaultwarden Server (Bitwarden compatible)
+Documentation=https://github.com/dani-garcia/vaultwarden
+After=network.target
+
+[Service]
+User=vaultwarden
+Group=vaultwarden
+EnvironmentFile=/etc/vaultwarden.env
+ExecStart=/usr/bin/vaultwarden
+Restart=on-failure
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/vaultwarden
+
+[Install]
+WantedBy=multi-user.target
+EOF
+}
