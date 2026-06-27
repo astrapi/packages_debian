@@ -30,6 +30,16 @@
     "git_url": "https://github.com/astrapi/packages_debian.git"
   },
   {
+    "name": "vaultwarden",
+    "pkgver": "1.36.0",
+    "pkgrel": "1",
+    "pkgdesc": "An alternative Bitwarden server API implementation written in Rust",
+    "arch": "amd64' 'arm64') # Hier die Architekturen eintragen, auf denen du baust",
+    "distribution": "trixie",
+    "subdir": "vaultwarden",
+    "git_url": "https://github.com/astrapi/packages_debian.git"
+  },
+  {
     "name": "vaultwarden-web-vault",
     "pkgver": "2026.4.1",
     "pkgrel": "2",
