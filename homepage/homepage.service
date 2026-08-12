@@ -1,0 +1,28 @@
+[Unit]
+Description=Homepage Dashboard
+Documentation=https://gethomepage.dev
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+User=homepage
+Group=homepage
+WorkingDirectory=/usr/share/webapps/homepage
+EnvironmentFile=/etc/conf.d/homepage
+ExecStart=/usr/bin/node /usr/share/webapps/homepage/server.js
+Restart=on-failure
+RestartSec=5s
+
+# Fuer Docker-Service-Discovery (optional, siehe optdepends in der
+# PKGBUILD): den "homepage"-User der Gruppe "docker" hinzufuegen
+# (usermod -aG docker homepage) und diese Zeile aktivieren.
+#SupplementaryGroups=docker
+
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/etc/homepage /var/lib/homepage
+
+[Install]
+WantedBy=multi-user.target

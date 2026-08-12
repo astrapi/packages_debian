@@ -1,0 +1,111 @@
+# Maintainer: Michael Otto <michael@astrapi.de>
+pkgname=homepage
+pkgver=1.13.2
+pkgrel=1
+pkgdesc="A highly customizable homepage (or startpage) with Docker and service API integrations"
+# Nur amd64: der Debian-Builder baut auf einem einzelnen Host ohne
+# Cross-Arch-Toolchain, und unten wird ein konkretes linux-x64-Node.js
+# geladen. Ausserdem kann build_index.py mehrwertige arch=(...)-Arrays
+# nicht sauber parsen (siehe T-001-DEBIAN) -- ein einzelner Wert
+# vermeidet das von vornherein.
+arch=('amd64')
+distribution=trixie
+url="https://gethomepage.dev"
+license=('GPL-3.0-only')
+depends=('nodejs (>= 20.9)')
+optdepends=('docker: für Docker-Service-Discovery (User "homepage" muss der Gruppe "docker" beitreten, siehe homepage.service)')
+source=()
+
+_sha256="4e11b0cf4a6b0b1e56a10145667fb93ecf6abeb4c2767375fc88f3d2b49cc04f"
+_tarball="${pkgname}-${pkgver}.tar.gz"
+_url="https://github.com/gethomepage/homepage/archive/refs/tags/v${pkgver}.tar.gz"
+
+# Node.js + pnpm sind im Debian-Builder-Image nicht vorinstalliert (nur
+# build-essential/devscripts/debhelper/git/curl/fakeroot) und lassen sich
+# dort mangels sudo/root auch nicht per apt-get nachruesten. Beide werden
+# deshalb -- wie grml-zsh-config/vaultwarden-web-vault es fuer ihre
+# Downloads bereits tun -- per curl geladen, gegen einen festen SHA256
+# geprueft und nur fuer diesen Bau lokal ins PATH gehaengt.
+_nodever="24.19.0"
+_node_sha256="14b342e71204f811bde6153be8e04b62aef63c236fef92b55f9c83154b409647"
+_node_tarball="node-v${_nodever}-linux-x64.tar.xz"
+_node_url="https://nodejs.org/dist/v${_nodever}/${_node_tarball}"
+
+_pnpmver="9.15.9"
+_pnpm_sha256="38949c3009bd674780ca7d652baa9e2310f5cda07ab9160b0e2a9c4934ab0def"
+_pnpm_url="https://github.com/pnpm/pnpm/releases/download/v${_pnpmver}/pnpm-linux-x64"
+
+build() {
+    curl -fSL -o "${_node_tarball}" "${_node_url}"
+    echo "${_node_sha256}  ${_node_tarball}" | sha256sum -c -
+    tar -xJf "${_node_tarball}"
+
+    curl -fSL -o pnpm "${_pnpm_url}"
+    echo "${_pnpm_sha256}  pnpm" | sha256sum -c -
+    chmod +x pnpm
+
+    export PATH="${srcdir}/node-v${_nodever}-linux-x64/bin:${srcdir}:${PATH}"
+
+    curl -fSL -o "${_tarball}" "${_url}"
+    echo "${_sha256}  ${_tarball}" | sha256sum -c -
+    tar -xzf "${_tarball}"
+
+    cd "${srcdir}/${pkgname}-${pkgver}"
+    NEXT_TELEMETRY_DISABLED=1 pnpm install --frozen-lockfile
+    NEXT_TELEMETRY_DISABLED=1 pnpm run build
+}
+
+package() {
+    # Voller srcdir-Pfad statt eines relativen "cd ${pkgname}-${pkgver}":
+    # package() laeuft in einer eigenen fakeroot-Subshell und darf sich
+    # nicht auf das cd aus build() verlassen.
+    cd "${srcdir}/${pkgname}-${pkgver}"
+
+    # Next.js-Standalone-Output installieren. Enthaelt server.js + eine
+    # eigene .next/-Kopie, aber bewusst NICHT die statischen Assets und
+    # nicht public/ -- die muss man laut Next.js-Doku separat dazukopieren
+    # (fehlte in der urspruenglichen PKGBUILD komplett, siehe T-002-DEBIAN:
+    # ohne .next/static waeren alle CSS/JS-Assets per 404 kaputt gewesen,
+    # ohne public/ hätten Favicons/Icons gefehlt).
+    install -d "${pkgdir}/usr/share/webapps/${pkgname}"
+    cp -r .next/standalone/. "${pkgdir}/usr/share/webapps/${pkgname}/"
+
+    install -d "${pkgdir}/usr/share/webapps/${pkgname}/.next/static"
+    cp -r .next/static/. "${pkgdir}/usr/share/webapps/${pkgname}/.next/static/"
+
+    cp -r public "${pkgdir}/usr/share/webapps/${pkgname}/public"
+
+    install -Dm644 "${srcdir}/homepage.service" "${pkgdir}/usr/lib/systemd/system/homepage.service"
+    install -Dm644 "${srcdir}/homepage.conf" "${pkgdir}/etc/conf.d/homepage"
+    install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+
+    install -d "${pkgdir}/usr/bin"
+    ln -s "/usr/share/webapps/${pkgname}/server.js" "${pkgdir}/usr/bin/homepage"
+
+    # Dedizierter System-User + Config-/Datenverzeichnis (der systemd-Unit
+    # verlangt User=homepage, ohne postinst gaebe es den nie).
+    install -d "${pkgdir}/DEBIAN"
+    cat > "${pkgdir}/DEBIAN/postinst" << 'EOF'
+#!/bin/sh
+set -e
+if ! getent passwd homepage >/dev/null; then
+    adduser --system --group --no-create-home --home /var/lib/homepage \
+        --shell /usr/sbin/nologin homepage
+fi
+install -d -o homepage -g homepage /etc/homepage
+install -d -o homepage -g homepage /var/lib/homepage
+EOF
+    chmod 755 "${pkgdir}/DEBIAN/postinst"
+
+    cat > "${pkgdir}/DEBIAN/postrm" << 'EOF'
+#!/bin/sh
+set -e
+if [ "$1" = "purge" ]; then
+    deluser --system homepage >/dev/null 2>&1 || true
+    rm -rf /var/lib/homepage
+fi
+EOF
+    chmod 755 "${pkgdir}/DEBIAN/postrm"
+}
+
+# vim:set ts=2 sw=2 et:
