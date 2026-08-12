@@ -20,6 +20,16 @@
     "git_url": "https://github.com/astrapi/packages_debian.git"
   },
   {
+    "name": "homepage",
+    "pkgver": "1.13.2",
+    "pkgrel": "1",
+    "pkgdesc": "A highly customizable homepage (or startpage) with Docker and service API integrations",
+    "arch": "amd64",
+    "distribution": "trixie",
+    "subdir": "homepage",
+    "git_url": "https://github.com/astrapi/packages_debian.git"
+  },
+  {
     "name": "simpsons-keyring",
     "pkgver": "1.0.0",
     "pkgrel": "2",
