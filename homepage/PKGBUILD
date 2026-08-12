@@ -1,7 +1,7 @@
 # Maintainer: Michael Otto <michael@astrapi.de>
 pkgname=homepage
 pkgver=1.13.2
-pkgrel=1
+pkgrel=2
 pkgdesc="A highly customizable homepage (or startpage) with Docker and service API integrations"
 # Nur amd64: der Debian-Builder baut auf einem einzelnen Host ohne
 # Cross-Arch-Toolchain, und unten wird ein konkretes linux-x64-Node.js
@@ -22,31 +22,41 @@ _url="https://github.com/gethomepage/homepage/archive/refs/tags/v${pkgver}.tar.g
 
 # Node.js + pnpm sind im Debian-Builder-Image nicht vorinstalliert (nur
 # build-essential/devscripts/debhelper/git/curl/fakeroot) und lassen sich
-# dort mangels sudo/root auch nicht per apt-get nachruesten. Beide werden
-# deshalb -- wie grml-zsh-config/vaultwarden-web-vault es fuer ihre
-# Downloads bereits tun -- per curl geladen, gegen einen festen SHA256
-# geprueft und nur fuer diesen Bau lokal ins PATH gehaengt.
-_nodever="24.19.0"
-_node_sha256="14b342e71204f811bde6153be8e04b62aef63c236fef92b55f9c83154b409647"
-_node_tarball="node-v${_nodever}-linux-x64.tar.xz"
-_node_url="https://nodejs.org/dist/v${_nodever}/${_node_tarball}"
+# dort mangels sudo/root auch nicht per apt-get nachruesten.
+#
+# Node.js kommt deshalb als .deb aus dem internen NodeSource-Mirror
+# (https://mirror.simpsons.lan/files/debian/node24x/) -- kein
+# echtes "apt-get install" (dafuer fehlt Root), stattdessen wird das
+# .deb per curl geladen, gegen den SHA256 aus dessen eigenem
+# Packages-Index geprueft und mit `dpkg-deb -x` ausgepackt (reine
+# Dateientnahme, kein Registrieren in dpkg noetig). Das
+# TLS-Zertifikat von mirror.simpsons.lan ist intern signiert -- curl
+# braucht hier -k, genau wie apt in debian-builder.dockerfile
+# (Acquire::https::Verify-Peer "false" fuer denselben Host).
+_nodedeb="nodejs_24.19.0-1nodesource1_amd64.deb"
+_nodedeb_sha256="132518334c7b6a30cb77731ecd2951d59b7714d18f8e3ce6d970323b561a272d"
+_nodedeb_url="https://mirror.simpsons.lan/files/debian/node24x/pool/main/n/nodejs/${_nodedeb}"
 
+# pnpm gibt es (Stand jetzt) nicht im internen Mirror -- Standalone-Binary
+# weiterhin direkt vom GitHub-Release, wie grml-zsh-config/
+# vaultwarden-web-vault es fuer ihre Downloads bereits tun.
 _pnpmver="9.15.9"
 _pnpm_sha256="38949c3009bd674780ca7d652baa9e2310f5cda07ab9160b0e2a9c4934ab0def"
 _pnpm_url="https://github.com/pnpm/pnpm/releases/download/v${_pnpmver}/pnpm-linux-x64"
 
 build() {
-    curl -fSL -o "${_node_tarball}" "${_node_url}"
-    echo "${_node_sha256}  ${_node_tarball}" | sha256sum -c -
-    tar -xJf "${_node_tarball}"
+    curl -fsSLk --retry 3 --retry-delay 2 -o "${_nodedeb}" "${_nodedeb_url}"
+    echo "${_nodedeb_sha256}  ${_nodedeb}" | sha256sum -c -
+    mkdir -p node-deb
+    dpkg-deb -x "${_nodedeb}" node-deb
 
-    curl -fSL -o pnpm "${_pnpm_url}"
+    curl -fSL --retry 3 --retry-delay 2 -o pnpm "${_pnpm_url}"
     echo "${_pnpm_sha256}  pnpm" | sha256sum -c -
     chmod +x pnpm
 
-    export PATH="${srcdir}/node-v${_nodever}-linux-x64/bin:${srcdir}:${PATH}"
+    export PATH="${srcdir}/node-deb/usr/bin:${srcdir}:${PATH}"
 
-    curl -fSL -o "${_tarball}" "${_url}"
+    curl -fSL --retry 3 --retry-delay 2 -o "${_tarball}" "${_url}"
     echo "${_sha256}  ${_tarball}" | sha256sum -c -
     tar -xzf "${_tarball}"
 
