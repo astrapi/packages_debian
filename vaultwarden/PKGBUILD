@@ -1,21 +1,44 @@
 # Maintainer: Michael Otto <michael@astrapi.de>
+#
+# Braucht Rust >= 1.93.0 (vaultwardens eigene rust-version-Vorgabe in
+# Cargo.toml) -- Debian trixie liefert nur 1.85.0, trixie-backports 1.94.1
+# aber mit einer grossen Kette an System-Bibliotheks-Abhaengigkeiten
+# (libgit2, libcurl4t64, libllvm21, ...). Statt das im PKGBUILD zu vendoren
+# (wie Node.js/pnpm bei homepage), baut dieses Paket deshalb mit dem
+# dedizierten Image "ctl/debian-builder-rust" (Basis: offizielles
+# rust:1.95.0-slim-trixie, siehe astrapi-packages/.../debian/dockerfiles/
+# debian-builder-rust.dockerfile) statt dem Standard-"ctl/debian-builder".
+# cargo/rustc kommen von dort bereits fertig mit.
 pkgname=vaultwarden
-pkgver=1.36.0  
-pkgrel=1
+pkgver=1.36.0
+pkgrel=2
 pkgdesc="An alternative Bitwarden server API implementation written in Rust"
-arch=('amd64' 'arm64') # Hier die Architekturen eintragen, auf denen du baust
+# Nur amd64: siehe homepage/PKGBUILD -- build_index.py kann ohnehin nur
+# einwertige arch=(...)-Arrays sauber parsen (T-001-DEBIAN).
+arch=('amd64')
 distribution=trixie
-depends=('libssl3' 'libsqlite3-0' 'vaultwarden-web-vault') # Erzwingt dein Web-Vault Paket
+depends=('libssl3t64' 'libsqlite3-0' 'vaultwarden-web-vault') # Erzwingt dein Web-Vault Paket
 makedepends=('cargo' 'rustc' 'pkg-config' 'libssl-dev' 'libsqlite3-dev')
-source=("https://github.com/dani-garcia/vaultwarden/archive/refs/tags/${pkgver}.tar.gz")
+source=()
+
+_sha256="8d506379fa19f21323c401b525ab5c6ca74de71509df81a9591ad5d5a4da2737"
+_tarball="${pkgname}-${pkgver}.tar.gz"
+_url="https://github.com/dani-garcia/vaultwarden/archive/refs/tags/${pkgver}.tar.gz"
 
 build() {
-    cd "${srcdir}/vaultwarden-${pkgver}"
+    curl -fSL --retry 3 --retry-delay 2 -o "${_tarball}" "${_url}"
+    echo "${_sha256}  ${_tarball}" | sha256sum -c -
+    tar -xzf "${_tarball}"
+
+    cd "${srcdir}/${pkgname}-${pkgver}"
     cargo build --features sqlite --release
 }
 
 package() {
-    cd "${srcdir}/vaultwarden-${pkgver}"
+    # Voller srcdir-Pfad statt eines relativen "cd ${pkgname}-${pkgver}":
+    # package() laeuft in einer eigenen fakeroot-Subshell und darf sich
+    # nicht auf das cd aus build() verlassen (siehe homepage/PKGBUILD).
+    cd "${srcdir}/${pkgname}-${pkgver}"
 
     install -Dm755 "target/release/vaultwarden" "${pkgdir}/usr/bin/vaultwarden"
 
@@ -50,4 +73,29 @@ ReadWritePaths=/var/lib/vaultwarden
 [Install]
 WantedBy=multi-user.target
 EOF
+
+    # Dedizierter System-User + Datenverzeichnis (die systemd-Unit
+    # verlangt User=vaultwarden, ohne postinst gaebe es den nie) --
+    # gleiches Muster wie homepage/PKGBUILD.
+    install -d "${pkgdir}/DEBIAN"
+    cat > "${pkgdir}/DEBIAN/postinst" << 'EOF'
+#!/bin/sh
+set -e
+if ! getent passwd vaultwarden >/dev/null; then
+    adduser --system --group --no-create-home --home /var/lib/vaultwarden \
+        --shell /usr/sbin/nologin vaultwarden
+fi
+install -d -o vaultwarden -g vaultwarden /var/lib/vaultwarden
+EOF
+    chmod 755 "${pkgdir}/DEBIAN/postinst"
+
+    cat > "${pkgdir}/DEBIAN/postrm" << 'EOF'
+#!/bin/sh
+set -e
+if [ "$1" = "purge" ]; then
+    deluser --system vaultwarden >/dev/null 2>&1 || true
+    rm -rf /var/lib/vaultwarden
+fi
+EOF
+    chmod 755 "${pkgdir}/DEBIAN/postrm"
 }
