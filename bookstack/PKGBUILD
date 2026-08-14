@@ -1,0 +1,182 @@
+# Maintainer: Michael Otto <michael@astrapi.de>
+#
+# Kein GitHub-Release-Asset vorhanden -- Quelle ist der automatisch von
+# GitHub erzeugte Tag-Sourcecode-Tarball. Anders als bei paperless-ngx wird
+# hier NICHT extra ein npm/Node-Frontend-Build gebraucht: BookStack
+# committet seine gebauten Frontend-Assets (public/dist/*.js/*.css) direkt
+# ins Repo, die offizielle Bare-Metal-Doku erwaehnt entsprechend nur
+# "git clone" + "composer install", kein npm. Siehe E-004.
+#
+# Braucht ein dediziertes Docker-Image (ctl/debian-builder-php statt
+# ctl/debian-builder, siehe E-004): composer.json verlangt PHP >= 8.2 und
+# mehrere ext-*-Erweiterungen, die im Standard-Image nicht vorinstalliert
+# sind. Debian trixies php 8.4 erfuellt die Versionsvorgabe ohne Weiteres,
+# kein exotisches Basis-Image wie bei vaultwarden/Rust noetig.
+pkgname=bookstack
+pkgver=26.05.3
+pkgrel=1
+pkgdesc="BookStack is a simple, self-hosted, easy-to-use platform for organising and storing information (wiki)"
+arch=('amd64')
+distribution=trixie
+url="https://www.bookstackapp.com"
+license=('MIT')
+depends=(
+    'php8.4-fpm'
+    'php8.4-cli'
+    'php8.4-curl'
+    'php8.4-xml'
+    'php8.4-mbstring'
+    'php8.4-gd'
+    'php8.4-zip'
+    'php8.4-mysql'
+    'mariadb-server'
+)
+# Dokumentarisch -- jobs.py wertet makedepends nicht aus, kommen fest aus
+# ctl/debian-builder-php (siehe E-004).
+makedepends=('php8.4-cli' 'composer' 'git')
+source=()
+
+_sha256="0cceef9fa56ea68b5717b1afee890472dd949ddedbe7c285305a65dc2fb06079"
+_tarball="bookstack-v${pkgver}.tar.gz"
+_url="https://github.com/BookStackApp/BookStack/archive/refs/tags/v${pkgver}.tar.gz"
+
+build() {
+    curl -fSL --retry 3 --retry-delay 2 -o "${_tarball}" "${_url}"
+    echo "${_sha256}  ${_tarball}" | sha256sum -c -
+    tar -xzf "${_tarball}"
+
+    cd "${srcdir}/BookStack-${pkgver}"
+    # --no-dev: keine Test-/Dev-Abhaengigkeiten (phpunit, phpstan, ...) im
+    # ausgelieferten Paket. Laravels "post-autoload-dump"-Hook ruft dabei
+    # "artisan package:discover" auf -- das braucht keine bereits
+    # vorhandene .env/DB-Verbindung, env()-Aufrufe fallen mangels .env auf
+    # ihre Config-Defaults zurueck.
+    COMPOSER_ALLOW_SUPERUSER=1 composer install \
+        --no-dev --no-interaction --optimize-autoloader --no-progress
+}
+
+package() {
+    # Voller srcdir-Pfad statt eines relativen "cd": package() laeuft in
+    # einer eigenen fakeroot-Subshell und darf sich nicht auf das cd aus
+    # build() verlassen (siehe homepage/vaultwarden/paperless-ngx PKGBUILD).
+    cd "${srcdir}/BookStack-${pkgver}"
+
+    # /var/www statt /opt/<pkgname> (Abweichung vom paperless-ngx-Muster):
+    # Debian-Konvention fuer Webanwendungen, Apache soll spaeter direkt auf
+    # /var/www/bookstack/public als DocumentRoot zeigen.
+    install -d "${pkgdir}/var/www/bookstack"
+    cp -r . "${pkgdir}/var/www/bookstack/"
+    rm -rf "${pkgdir}/var/www/bookstack/.git" "${pkgdir}/var/www/bookstack/tests"
+
+    # Echte .env-Datei statt /etc/*.conf + systemd-EnvironmentFile (wie bei
+    # paperless-ngx): PHP-FPM hat kein Aequivalent fuer viele Variablen auf
+    # einmal, Laravel/BookStack erwartet laut eigener Doku ausdruecklich
+    # eine .env im App-Wurzelverzeichnis.
+    rm -f "${pkgdir}/var/www/bookstack/.env"
+    install -Dm640 /dev/null "${pkgdir}/var/www/bookstack/.env"
+    cat <<'EOF' > "${pkgdir}/var/www/bookstack/.env"
+# BookStack Konfiguration fuer Debian
+# Volle Optionsliste: .env.example.complete im App-Verzeichnis
+
+APP_ENV=production
+APP_DEBUG=false
+# Wird von postinst automatisch generiert (php artisan key:generate),
+# solange hier noch "SomeRandomString" steht.
+APP_KEY=SomeRandomString
+APP_URL=http://localhost
+
+DB_HOST=localhost
+DB_DATABASE=bookstack
+DB_USERNAME=bookstack
+DB_PASSWORD=change-me
+
+MAIL_DRIVER=smtp
+MAIL_FROM_NAME="BookStack"
+MAIL_FROM=bookstack@example.com
+MAIL_HOST=localhost
+MAIL_PORT=587
+MAIL_USERNAME=null
+MAIL_PASSWORD=null
+MAIL_ENCRYPTION=null
+EOF
+
+    # PHP-FPM-Pool statt eigenem systemd-Dienst -- das bereits laufende
+    # System-php8.4-fpm liest pool.d/*.conf automatisch ein (siehe E-004).
+    # listen.owner/-group=www-data: Annahme, dass Apache mit dem
+    # Debian-Standardbenutzer www-data laeuft und den Socket per
+    # mod_proxy_fcgi ansprechen soll -- bei abweichendem Apache-User
+    # anpassen.
+    install -Dm644 /dev/null "${pkgdir}/etc/php/8.4/fpm/pool.d/bookstack.conf"
+    cat <<'EOF' > "${pkgdir}/etc/php/8.4/fpm/pool.d/bookstack.conf"
+[bookstack]
+user = bookstack
+group = bookstack
+listen = /run/php/bookstack.sock
+listen.owner = www-data
+listen.group = www-data
+listen.mode = 0660
+
+pm = dynamic
+pm.max_children = 5
+pm.start_servers = 2
+pm.min_spare_servers = 1
+pm.max_spare_servers = 3
+
+php_admin_value[error_log] = /var/www/bookstack/storage/logs/fpm-error.log
+php_admin_flag[log_errors] = on
+EOF
+
+    # Dedizierter System-User + Schreibrechte fuer genau die drei von der
+    # offiziellen Doku genannten Verzeichnisse (storage, bootstrap/cache,
+    # public/uploads) -- gleiches Muster wie vaultwarden/paperless-ngx,
+    # sonst bleibt der App-Baum root-owned/read-only.
+    install -d "${pkgdir}/DEBIAN"
+    cat > "${pkgdir}/DEBIAN/postinst" << 'EOF'
+#!/bin/sh
+set -e
+if ! getent passwd bookstack >/dev/null; then
+    adduser --system --group --no-create-home --home /var/www/bookstack \
+        --shell /usr/sbin/nologin bookstack
+fi
+chown -R bookstack:bookstack /var/www/bookstack/storage
+chown -R bookstack:bookstack /var/www/bookstack/bootstrap/cache
+chown -R bookstack:bookstack /var/www/bookstack/public/uploads
+
+chown root:bookstack /var/www/bookstack/.env
+chmod 640 /var/www/bookstack/.env
+
+if grep -q '^APP_KEY=SomeRandomString$' /var/www/bookstack/.env; then
+    php8.4 /var/www/bookstack/artisan key:generate --force --ansi
+fi
+
+systemctl reload php8.4-fpm 2>/dev/null || true
+
+cat <<'MSG'
+BookStack installiert, aber noch nicht startklar:
+  1. /var/www/bookstack/.env ausfuellen (mindestens DB_PASSWORD, APP_URL)
+  2. MariaDB-Rolle + Datenbank anlegen (Name/User/Passwort aus .env)
+  3. Erstes Migrate:
+     sudo -u bookstack php8.4 /var/www/bookstack/artisan migrate --force
+  4. Apache selbst einrichten: DocumentRoot auf
+     /var/www/bookstack/public, ProxyPass auf den FPM-Socket
+     /run/php/bookstack.sock (Paket richtet bewusst keinen vhost ein)
+  5. Falls von v25.x aktualisiert: storage/fonts-Rechte pruefen
+     (PDF-Export, seit v26.05 geaendert) und SMTP-Versand testen
+     (Einstellungen > Wartung > Test-E-Mail senden)
+MSG
+EOF
+    chmod 755 "${pkgdir}/DEBIAN/postinst"
+
+    cat > "${pkgdir}/DEBIAN/postrm" << 'EOF'
+#!/bin/sh
+set -e
+if [ "$1" = "purge" ]; then
+    deluser --system bookstack >/dev/null 2>&1 || true
+    rm -rf /var/www/bookstack/storage/app /var/www/bookstack/storage/backups \
+        /var/www/bookstack/storage/uploads /var/www/bookstack/public/uploads
+fi
+EOF
+    chmod 755 "${pkgdir}/DEBIAN/postrm"
+}
+
+# vim:set ts=2 sw=2 et:
