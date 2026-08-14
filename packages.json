@@ -30,6 +30,16 @@
     "git_url": "https://github.com/astrapi/packages_debian.git"
   },
   {
+    "name": "paperless-ngx",
+    "pkgver": "2.20.5",
+    "pkgrel": "1",
+    "pkgdesc": "A community-supported supercharged document management system: scan, index and archive all your physical documents",
+    "arch": "amd64",
+    "distribution": "trixie",
+    "subdir": "paperless-ngx",
+    "git_url": "https://github.com/astrapi/packages_debian.git"
+  },
+  {
     "name": "simpsons-keyring",
     "pkgver": "1.0.0",
     "pkgrel": "2",
