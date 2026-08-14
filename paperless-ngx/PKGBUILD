@@ -1,0 +1,317 @@
+# Maintainer: Michael Otto <michael@astrapi.de>
+#
+# Bewusst NICHT auf das aktuell neueste v3.0.5 aktualisiert: der Sprung auf
+# v3.0 hat mehrere Breaking Changes (Python 3.11+ jetzt Pflicht,
+# pybzar-Barcode-Reader entfernt, Dokument-/Thumbnail-Verschluesselung
+# entfernt, API v1 + API-Versionen < 9 entfernt, DB-Konfiguration umgebaut,
+# Pre-/Post-Consume-Skripte verlieren Positionsargumente) -- kein
+# "problemloses" Update von der vorher laufenden v2.20.5, siehe E-003.
+#
+# Nutzt bewusst das offizielle Release-Tarball statt eines Git-Checkouts:
+# enthaelt bereits ein fertig gebautes Frontend (static/, collectstatic
+# bereits gelaufen) UND fertige systemd-Unit-Vorlagen (scripts/*.service) --
+# kein Node/Angular-Build noetig, anders als bei homepage/PKGBUILD.
+#
+# Braucht ein dediziertes Docker-Image (ctl/debian-builder-python statt
+# ctl/debian-builder, siehe E-003): "requirements.txt" pinnt
+# psycopg-c==3.2.12, PyPI hat dafuer nur fuer cp312+x86_64/aarch64 ein
+# eigenes (von paperless-ngx selbst gehostetes) Wheel -- unter Debian
+# trixies python3 (3.13) baut pip das Paket also aus Quelltext, dafuer
+# braucht es libpq-dev + einen Compiler. Alle anderen kompilier-verdaechtigen
+# Abhaengigkeiten (pikepdf, lxml, numpy, pillow, cryptography, scikit-learn,
+# zxing-cpp) haben bestaetigte cp313-Wheels auf PyPI.
+pkgname=paperless-ngx
+pkgver=2.20.5
+pkgrel=1
+pkgdesc="A community-supported supercharged document management system: scan, index and archive all your physical documents"
+arch=('amd64')
+distribution=trixie
+url="https://docs.paperless-ngx.com"
+license=('GPL-3.0-only')
+depends=(
+    'python3'
+    'redis-server'
+    'postgresql'
+    'tesseract-ocr'
+    'tesseract-ocr-eng'
+    'tesseract-ocr-deu'
+    'tesseract-ocr-fra'
+    'tesseract-ocr-ita'
+    'tesseract-ocr-spa'
+    'poppler-utils'
+    'ghostscript'
+    'qpdf'
+    'unpaper'
+    'liblept5'
+    'libxml2'
+    'pngquant'
+    'zlib1g'
+    'imagemagick'
+    'fonts-liberation'
+    'libmagic1'
+    'libzbar0'
+    'gnupg'
+)
+# Dokumentarisch -- jobs.py wertet makedepends nicht aus, kommen fest aus
+# ctl/debian-builder-python (siehe E-003).
+makedepends=('python3-venv' 'python3-dev' 'libpq-dev' 'pkg-config')
+source=()
+
+_sha256="730848759f510869448a159b8b9e9718460d51437eacc9db726d14affa11edcf"
+_tarball="paperless-ngx-v${pkgver}.tar.xz"
+_url="https://github.com/paperless-ngx/paperless-ngx/releases/download/v${pkgver}/${_tarball}"
+
+build() {
+    curl -fSL --retry 3 --retry-delay 2 -o "${_tarball}" "${_url}"
+    echo "${_sha256}  ${_tarball}" | sha256sum -c -
+    tar -xJf "${_tarball}"
+
+    cd "${srcdir}/paperless-ngx"
+
+    # requirements.txt wurde mit "uv export --all-extras" erzeugt und enthaelt
+    # deshalb auch die optionale "mariadb"-Extra (einziger Extra-Block in
+    # pyproject.toml: mysqlclient~=2.2.7). Wir nutzen PostgreSQL, nicht
+    # MariaDB -- mysqlclient braucht zum Bauen aus Quelltext
+    # libmariadb-dev/default-libmysqlclient-dev, das das Image nicht hat
+    # (verifiziert: pip bricht sonst mit "Can not find valid pkg-config name"
+    # ab). Statt das Image dafuer aufzublasen, wird der ungenutzte Block
+    # rausgefiltert -- awk statt sed, weil der Eintrag ueber drei Zeilen geht
+    # (Paketzeile + --hash-Zeile + "# via"-Kommentar).
+    awk '
+        $0 ~ /^[^[:space:]]/ { skip = ($0 ~ /^mysqlclient==/) ? 1 : 0 }
+        !skip { print }
+    ' requirements.txt > requirements.postgres.txt
+
+    python3 -m venv "${srcdir}/venv"
+    "${srcdir}/venv/bin/pip" install --upgrade pip
+    # requirements.postgres.txt enthaelt --hash=sha256:... fuer jede
+    # Abhaengigkeit (von "uv export" erzeugt) -- pip verifiziert das
+    # automatisch.
+    "${srcdir}/venv/bin/pip" install -r requirements.postgres.txt
+
+    # Ein venv ist nicht von Haus aus umzugsfaehig: pip schreibt in jedes
+    # Console-Script (celery, granian, pip, ...) eine feste Shebang-Zeile
+    # mit dem absoluten Erzeugungspfad (hier "${srcdir}/venv/bin/python3",
+    # also z.B. /build/src/paperless-ngx/venv/bin/python3) -- verifiziert:
+    # ohne diesen Fix scheitert jeder Start mit "No such file or directory",
+    # weil der Kernel den Interpreter aus der Shebang-Zeile sucht, und der
+    # existiert am Zielsystem (/opt/paperless/venv) nicht. Deshalb auf den
+    # tatsaechlichen Installationspfad umschreiben, bevor package() das venv
+    # dorthin kopiert.
+    for f in "${srcdir}/venv/bin/"*; do
+        [[ -f "$f" ]] || continue
+        head -1 "$f" | grep -q "^#!${srcdir}/venv/bin/python3" || continue
+        sed -i "1s|^#!.*|#!/opt/paperless/venv/bin/python3|" "$f"
+    done
+
+    # NLTK-Sprachdaten fuer die Volltextsuche, gleiche drei Pakete wie im
+    # offiziellen Dockerfile (Zeile "Installing NLTK data").
+    "${srcdir}/venv/bin/python3" -W ignore::RuntimeWarning -m nltk.downloader \
+        -d "${srcdir}/nltk_data" snowball_data stopwords punkt_tab
+}
+
+package() {
+    # Voller srcdir-Pfad statt eines relativen "cd": package() laeuft in
+    # einer eigenen fakeroot-Subshell und darf sich nicht auf das cd aus
+    # build() verlassen (siehe homepage/vaultwarden PKGBUILD).
+    cd "${srcdir}/paperless-ngx"
+
+    install -d "${pkgdir}/opt/paperless"
+    cp -r src "${pkgdir}/opt/paperless/src"
+    cp -r static "${pkgdir}/opt/paperless/static"
+    cp -r "${srcdir}/venv" "${pkgdir}/opt/paperless/venv"
+
+    install -d "${pkgdir}/usr/share/nltk_data"
+    cp -r "${srcdir}/nltk_data/." "${pkgdir}/usr/share/nltk_data/"
+
+    # MEDIA_ROOT/DATA_DIR/STATIC_ROOT/CONSUMPTION_DIR muessen NICHT gesetzt
+    # werden: paperless-ngx' settings.py defaulted sie auf
+    # BASE_DIR.parent/{media,data,static,consume} -- bei
+    # WorkingDirectory=/opt/paperless/src trifft das von selbst genau unser
+    # Layout.
+    install -Dm640 /dev/null "${pkgdir}/etc/paperless.conf"
+    cat <<'EOF' > "${pkgdir}/etc/paperless.conf"
+# paperless-ngx Konfiguration fuer Debian
+# Volle Optionsliste: https://docs.paperless-ngx.com/configuration/
+
+PAPERLESS_REDIS=redis://localhost:6379
+PAPERLESS_DBENGINE=postgresql
+PAPERLESS_DBHOST=localhost
+PAPERLESS_DBNAME=paperless
+PAPERLESS_DBUSER=paperless
+PAPERLESS_DBPASS=change-me
+
+# Wird von postinst automatisch durch einen echten Zufallswert ersetzt,
+# solange hier noch "change-me" steht.
+PAPERLESS_SECRET_KEY=change-me
+
+PAPERLESS_TIME_ZONE=Europe/Berlin
+PAPERLESS_OCR_LANGUAGE=deu
+PAPERLESS_OCR_LANGUAGES=eng fra ita spa
+
+# PAPERLESS_URL=https://paperless.example.com
+EOF
+
+    # systemd-Units: aus den Vorlagen im Release-Tarball (scripts/*.service)
+    # uebernommen, aber ExecStart auf das vendorte venv umgebogen (statt
+    # nacktes System-python3/celery), EnvironmentFile ergaenzt, und
+    # "Requires=redis.service" -> "Requires=redis-server.service" (der
+    # tatsaechliche Debian-Unit-Name, redis.service existiert dort nicht).
+    install -d "${pkgdir}/usr/lib/systemd/system"
+
+    install -Dm644 /dev/null "${pkgdir}/usr/lib/systemd/system/paperless-webserver.service"
+    cat <<'EOF' > "${pkgdir}/usr/lib/systemd/system/paperless-webserver.service"
+[Unit]
+Description=Paperless webserver
+After=network.target
+Wants=network.target
+Requires=redis-server.service
+#Requires=paperless-webserver.socket
+
+[Service]
+User=paperless
+Group=paperless
+WorkingDirectory=/opt/paperless/src
+EnvironmentFile=/etc/paperless.conf
+
+Environment=GRANIAN_HOST=::
+Environment=GRANIAN_PORT=8000
+Environment=GRANIAN_WORKERS=1
+
+ExecStart=/bin/sh -c '\
+  [ -n "$PAPERLESS_BIND_ADDR" ] && export GRANIAN_HOST=$PAPERLESS_BIND_ADDR; \
+  [ -n "$PAPERLESS_PORT" ] && export GRANIAN_PORT=$PAPERLESS_PORT; \
+  [ -n "$PAPERLESS_WEBSERVER_WORKERS" ] && export GRANIAN_WORKERS=$PAPERLESS_WEBSERVER_WORKERS; \
+  [ -n "$PAPERLESS_FORCE_SCRIPT_NAME" ] && export GRANIAN_URL_PATH_PREFIX=$PAPERLESS_FORCE_SCRIPT_NAME; \
+  exec /opt/paperless/venv/bin/granian --interface asginl --ws "paperless.asgi:application"'
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    chmod 644 "${pkgdir}/usr/lib/systemd/system/paperless-webserver.service"
+
+    install -Dm644 /dev/null "${pkgdir}/usr/lib/systemd/system/paperless-webserver.socket"
+    cat <<'EOF' > "${pkgdir}/usr/lib/systemd/system/paperless-webserver.socket"
+[Unit]
+Description=Paperless Webserver Socket
+
+[Socket]
+ListenStream=8000
+NoDelay=true
+
+[Install]
+WantedBy=sockets.target
+EOF
+    chmod 644 "${pkgdir}/usr/lib/systemd/system/paperless-webserver.socket"
+
+    install -Dm644 /dev/null "${pkgdir}/usr/lib/systemd/system/paperless-consumer.service"
+    cat <<'EOF' > "${pkgdir}/usr/lib/systemd/system/paperless-consumer.service"
+[Unit]
+Description=Paperless consumer
+Requires=redis-server.service
+
+[Service]
+User=paperless
+Group=paperless
+WorkingDirectory=/opt/paperless/src
+EnvironmentFile=/etc/paperless.conf
+ExecStart=/opt/paperless/venv/bin/python3 manage.py document_consumer
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    chmod 644 "${pkgdir}/usr/lib/systemd/system/paperless-consumer.service"
+
+    install -Dm644 /dev/null "${pkgdir}/usr/lib/systemd/system/paperless-task-queue.service"
+    cat <<'EOF' > "${pkgdir}/usr/lib/systemd/system/paperless-task-queue.service"
+[Unit]
+Description=Paperless Celery Workers
+Requires=redis-server.service
+
+[Service]
+User=paperless
+Group=paperless
+WorkingDirectory=/opt/paperless/src
+EnvironmentFile=/etc/paperless.conf
+ExecStart=/opt/paperless/venv/bin/celery --app paperless worker --loglevel INFO
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    chmod 644 "${pkgdir}/usr/lib/systemd/system/paperless-task-queue.service"
+
+    install -Dm644 /dev/null "${pkgdir}/usr/lib/systemd/system/paperless-scheduler.service"
+    cat <<'EOF' > "${pkgdir}/usr/lib/systemd/system/paperless-scheduler.service"
+[Unit]
+Description=Paperless Celery Beat
+Requires=redis-server.service
+
+[Service]
+User=paperless
+Group=paperless
+WorkingDirectory=/opt/paperless/src
+EnvironmentFile=/etc/paperless.conf
+ExecStart=/opt/paperless/venv/bin/celery --app paperless beat --loglevel INFO
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    chmod 644 "${pkgdir}/usr/lib/systemd/system/paperless-scheduler.service"
+
+    # Dedizierter System-User + Daten-/Medienverzeichnisse -- gleiches Muster
+    # wie vaultwarden/homepage. PAPERLESS_SECRET_KEY wird beim ersten
+    # Postinst-Lauf generiert, solange noch der Platzhalter drinsteht (auch
+    # bei einem Reinstall/Upgrade idempotent, ueberschreibt keinen bereits
+    # gesetzten echten Wert).
+    install -d "${pkgdir}/DEBIAN"
+    cat > "${pkgdir}/DEBIAN/postinst" << 'EOF'
+#!/bin/sh
+set -e
+if ! getent passwd paperless >/dev/null; then
+    adduser --system --group --no-create-home --home /opt/paperless \
+        --shell /usr/sbin/nologin paperless
+fi
+install -d -o paperless -g paperless /opt/paperless/media
+install -d -o paperless -g paperless /opt/paperless/data
+install -d -o paperless -g paperless /opt/paperless/consume
+install -d -o paperless -g paperless /opt/paperless/export
+
+chown root:paperless /etc/paperless.conf
+chmod 640 /etc/paperless.conf
+
+if grep -q '^PAPERLESS_SECRET_KEY=change-me$' /etc/paperless.conf; then
+    _key=$(head -c 48 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 64)
+    sed -i "s/^PAPERLESS_SECRET_KEY=change-me\$/PAPERLESS_SECRET_KEY=${_key}/" /etc/paperless.conf
+fi
+
+cat <<'MSG'
+paperless-ngx installiert, aber noch nicht startklar:
+  1. /etc/paperless.conf ausfuellen (mindestens PAPERLESS_DBPASS)
+  2. PostgreSQL-Rolle + Datenbank anlegen (Name/User/Passwort aus
+     /etc/paperless.conf)
+  3. Erstes Migrate:
+     sudo -u paperless /opt/paperless/venv/bin/python3 \
+       /opt/paperless/src/manage.py migrate
+  4. Dienste aktivieren:
+     systemctl enable --now paperless-webserver paperless-consumer \
+       paperless-task-queue paperless-scheduler
+MSG
+EOF
+    chmod 755 "${pkgdir}/DEBIAN/postinst"
+
+    cat > "${pkgdir}/DEBIAN/postrm" << 'EOF'
+#!/bin/sh
+set -e
+if [ "$1" = "purge" ]; then
+    deluser --system paperless >/dev/null 2>&1 || true
+    rm -rf /opt/paperless/media /opt/paperless/data /opt/paperless/consume /opt/paperless/export
+fi
+EOF
+    chmod 755 "${pkgdir}/DEBIAN/postrm"
+}
+
+# vim:set ts=2 sw=2 et:
