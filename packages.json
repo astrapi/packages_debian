@@ -10,6 +10,16 @@
     "git_url": "https://github.com/astrapi/packages_debian.git"
   },
   {
+    "name": "claude-temp-access",
+    "pkgver": "1.0.0",
+    "pkgrel": "1",
+    "pkgdesc": "Temporären, eng begrenzten SSH/sudo-Zugang für Claude Code auf bare-metal-Servern einrichten/entfernen",
+    "arch": "all",
+    "distribution": "trixie",
+    "subdir": "claude-temp-access",
+    "git_url": "https://github.com/astrapi/packages_debian.git"
+  },
+  {
     "name": "grml-zsh-config",
     "pkgver": "0.19.28",
     "pkgrel": "1",
