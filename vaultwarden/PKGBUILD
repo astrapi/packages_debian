@@ -11,7 +11,7 @@
 # cargo/rustc kommen von dort bereits fertig mit.
 pkgname=vaultwarden
 pkgver=1.36.0
-pkgrel=2
+pkgrel=3
 pkgdesc="An alternative Bitwarden server API implementation written in Rust"
 # Nur amd64: siehe homepage/PKGBUILD -- build_index.py kann ohnehin nur
 # einwertige arch=(...)-Arrays sauber parsen (T-001-DEBIAN).
@@ -45,7 +45,16 @@ package() {
     install -Dm640 /dev/null "${pkgdir}/etc/vaultwarden.env"
     cat <<EOF > "${pkgdir}/etc/vaultwarden.env"
 # Vaultwarden Konfiguration für Debian
-DATA_FOLDER=/var/lib/vaultwarden
+#
+# DATA_FOLDER zeigt bewusst auf einen "data"-Unterordner (nicht direkt
+# auf /var/lib/vaultwarden) -- das ist Vaultwardens eigener Default
+# (relativ zum Working Directory) und die Konvention, mit der auch
+# andere gaengige Debian-Pakete dieses Projekts (z.B. das von
+# dionysius) die Daten ablegen. Wichtig fuer Hosts, auf denen vorher
+# schon mal ein anderes vaultwarden-Debian-Paket lief: dessen Vault
+# liegt mit hoher Wahrscheinlichkeit ebenfalls unter .../data und wird
+# so automatisch weiterverwendet statt eine neue, leere DB anzulegen.
+DATA_FOLDER=/var/lib/vaultwarden/data
 WEB_VAULT_FOLDER=/usr/share/vaultwarden/web-vault
 WEB_VAULT_ENABLED=true
 ROCKET_ADDRESS=127.0.0.1
@@ -86,6 +95,7 @@ if ! getent passwd vaultwarden >/dev/null; then
         --shell /usr/sbin/nologin vaultwarden
 fi
 install -d -o vaultwarden -g vaultwarden /var/lib/vaultwarden
+install -d -o vaultwarden -g vaultwarden /var/lib/vaultwarden/data
 EOF
     chmod 755 "${pkgdir}/DEBIAN/postinst"
 
