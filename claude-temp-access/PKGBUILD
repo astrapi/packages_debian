@@ -1,0 +1,15 @@
+# Maintainer: Michael Otto <michael@astrapi.de>
+pkgname=claude-temp-access
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Temporären, eng begrenzten SSH/sudo-Zugang für Claude Code auf bare-metal-Servern einrichten/entfernen"
+arch=('all')
+distribution=trixie
+depends=()
+makedepends=()
+source=('claude-access-enable.sh' 'claude-access-disable.sh')
+
+package() {
+    install -Dm755 claude-access-enable.sh "$pkgdir/usr/local/sbin/claude-access-enable"
+    install -Dm755 claude-access-disable.sh "$pkgdir/usr/local/sbin/claude-access-disable"
+}
