@@ -62,7 +62,7 @@
   {
     "name": "vaultwarden",
     "pkgver": "1.36.0",
-    "pkgrel": "2",
+    "pkgrel": "3",
     "pkgdesc": "An alternative Bitwarden server API implementation written in Rust",
     "arch": "amd64",
     "distribution": "trixie",
