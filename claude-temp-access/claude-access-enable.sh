@@ -2,27 +2,35 @@
 # claude-access-enable — richtet einen temporären, eng begrenzten
 # SSH/sudo-Zugang für Claude Code ein (System-User "claude").
 #
-# Usage: claude-access-enable "<ssh-public-key>" [service ...]
+# Usage: claude-access-enable [service ...]
+#        claude-access-enable "<ssh-public-key>" [service ...]
 #
-# Für jeden angegebenen Service werden NOPASSWD-sudo-Regeln für die
-# üblichen Diagnose-Befehle angelegt (systemctl status, journalctl,
+# Nutzt standardmaessig einen festen, ueber Sessions hinweg wiederverwendeten
+# Public Key (siehe DEFAULT_PUBKEY) -- kein Key-Parameter noetig, damit
+# "sudo claude-access-enable <service>" jedes Mal ohne Rueckfrage
+# funktioniert. Optional laesst sich der Key weiterhin explizit
+# ueberschreiben, indem das erste Argument mit "ssh-"/"ecdsa-"/"sk-"
+# beginnt (z.B. fuer eine Key-Rotation).
+#
+# Fuer jeden angegebenen Service werden NOPASSWD-sudo-Regeln fuer die
+# ueblichen Diagnose-Befehle angelegt (systemctl status, journalctl,
 # Config-/Unit-Dateien lesen, Datenverzeichnis auflisten/finden) --
 # kein pauschaler Root-Zugriff. Ohne Service-Argumente gibt es nur den
 # SSH-Login, keine sudo-Rechte.
 set -euo pipefail
+
+DEFAULT_PUBKEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINa3mK1PYQ2rxGMWuvt5n3RzzPjJzouKarDBFGY1hslu claude-code-persistent-temp-access"
 
 if [[ $EUID -ne 0 ]]; then
     echo "Muss als root laufen (sudo)." >&2
     exit 1
 fi
 
-if [[ $# -lt 1 ]]; then
-    echo "Usage: $0 \"<ssh-public-key>\" [service ...]" >&2
-    exit 1
+PUBKEY="$DEFAULT_PUBKEY"
+if [[ $# -gt 0 && "$1" =~ ^(ssh-|ecdsa-sha2-|sk-ssh-|sk-ecdsa-) ]]; then
+    PUBKEY="$1"
+    shift
 fi
-
-PUBKEY="$1"
-shift
 SERVICES=("$@")
 
 USER_NAME=claude

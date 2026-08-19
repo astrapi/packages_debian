@@ -1,6 +1,6 @@
 # Maintainer: Michael Otto <michael@astrapi.de>
 pkgname=claude-temp-access
-pkgver=1.0.0
+pkgver=1.1.0
 pkgrel=1
 pkgdesc="Temporären, eng begrenzten SSH/sudo-Zugang für Claude Code auf bare-metal-Servern einrichten/entfernen"
 arch=('all')
