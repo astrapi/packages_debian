@@ -1,17 +1,27 @@
 # Maintainer: Michael Otto <michael@astrapi.de>
 #
-# Braucht Rust >= 1.93.0 (vaultwardens eigene rust-version-Vorgabe in
-# Cargo.toml) -- Debian trixie liefert nur 1.85.0, trixie-backports 1.94.1
-# aber mit einer grossen Kette an System-Bibliotheks-Abhaengigkeiten
-# (libgit2, libcurl4t64, libllvm21, ...). Statt das im PKGBUILD zu vendoren
-# (wie Node.js/pnpm bei homepage), baut dieses Paket deshalb mit dem
-# dedizierten Image "ctl/debian-builder-rust" (Basis: offizielles
-# rust:1.95.0-slim-trixie, siehe astrapi-packages/.../debian/dockerfiles/
-# debian-builder-rust.dockerfile) statt dem Standard-"ctl/debian-builder".
-# cargo/rustc kommen von dort bereits fertig mit.
+# Braucht Rust >= 1.95.0 (vaultwardens eigene rust-version-Vorgabe in
+# Cargo.toml, Stand 1.37.1) -- Debian trixie liefert nur 1.85.0, trixie-
+# backports 1.94.1 aber mit einer grossen Kette an System-Bibliotheks-
+# Abhaengigkeiten (libgit2, libcurl4t64, libllvm21, ...). Statt das im
+# PKGBUILD zu vendoren (wie Node.js/pnpm bei homepage), baut dieses Paket
+# deshalb mit dem dedizierten Image "ctl/debian-builder-rust" (Basis:
+# offizielles rust:1.95.0-slim-trixie, siehe astrapi-packages/.../debian/
+# dockerfiles/debian-builder-rust.dockerfile) statt dem Standard-
+# "ctl/debian-builder". cargo/rustc kommen von dort bereits fertig mit.
+#
+# pkgver 1.36.0 -> 1.37.1: vaultwarden 1.36.0 hat einen serverseitigen
+# Serialisierungsfehler im /api/sync-Cipher-"data"-Feld, der mit dem
+# strikten WASM-SDK neuerer offizieller Bitwarden-Clients (Browser/
+# Desktop/Mobile ab ca. 2026.4.x) kollidiert ("Unexpected JSON token ...
+# Expected beginning of the string, but got {" bzw. "invalid type:
+# JsValue(Object(...)), expected a string") -- Web-Vault (aelterer JS-SDK)
+# bleibt davon unberuehrt, daher unauffaellig dort. Behoben in vaultwarden
+# 1.37.0 (PR dani-garcia/vaultwarden#7434, das fehlerhafte Feld existiert
+# danach nicht mehr). MSRV bleibt bei genau 1.95.0, Image passt weiterhin.
 pkgname=vaultwarden
-pkgver=1.36.0
-pkgrel=3
+pkgver=1.37.1
+pkgrel=1
 pkgdesc="An alternative Bitwarden server API implementation written in Rust"
 # Nur amd64: siehe homepage/PKGBUILD -- build_index.py kann ohnehin nur
 # einwertige arch=(...)-Arrays sauber parsen (T-001-DEBIAN).
@@ -21,7 +31,7 @@ depends=('libssl3t64' 'libsqlite3-0' 'vaultwarden-web-vault') # Erzwingt dein We
 makedepends=('cargo' 'rustc' 'pkg-config' 'libssl-dev' 'libsqlite3-dev')
 source=()
 
-_sha256="8d506379fa19f21323c401b525ab5c6ca74de71509df81a9591ad5d5a4da2737"
+_sha256="32c43436517fe67bdf207cf9e803a3b71e87703f384604588d360f7e6724f045"
 _tarball="${pkgname}-${pkgver}.tar.gz"
 _url="https://github.com/dani-garcia/vaultwarden/archive/refs/tags/${pkgver}.tar.gz"
 
