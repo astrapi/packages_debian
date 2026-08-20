@@ -51,8 +51,8 @@
   },
   {
     "name": "paperless-ngx",
-    "pkgver": "2.20.5",
-    "pkgrel": "2",
+    "pkgver": "2.20.15",
+    "pkgrel": "1",
     "pkgdesc": "A community-supported supercharged document management system: scan, index and archive all your physical documents",
     "arch": "amd64",
     "distribution": "trixie",
