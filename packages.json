@@ -2,7 +2,7 @@
   {
     "name": "bookstack",
     "pkgver": "26.05.3",
-    "pkgrel": "2",
+    "pkgrel": "3",
     "pkgdesc": "BookStack is a simple, self-hosted, easy-to-use platform for organising and storing information (wiki)",
     "arch": "amd64",
     "distribution": "trixie",
