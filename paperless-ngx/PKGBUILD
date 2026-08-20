@@ -1,11 +1,13 @@
 # Maintainer: Michael Otto <michael@astrapi.de>
 #
-# Bewusst NICHT auf das aktuell neueste v3.0.5 aktualisiert: der Sprung auf
-# v3.0 hat mehrere Breaking Changes (Python 3.11+ jetzt Pflicht,
-# pybzar-Barcode-Reader entfernt, Dokument-/Thumbnail-Verschluesselung
-# entfernt, API v1 + API-Versionen < 9 entfernt, DB-Konfiguration umgebaut,
-# Pre-/Post-Consume-Skripte verlieren Positionsargumente) -- kein
-# "problemloses" Update von der vorher laufenden v2.20.5, siehe E-003.
+# v2.20.15 statt v2.20.5: reines Sicherheits-/Bugfix-Release (u.a.
+# GHSA-8c6x-pfjq-9gr7), keine Breaking Changes/Logikaenderung noetig --
+# aber ein zwingender Zwischenschritt: laut offiziellem
+# docs/migration-v3.md ist ein Upgrade auf v3.0 NUR ab genau v2.20.15
+# moeglich, nicht ab einer beliebigen 2.20.x-Version. Siehe
+# T-015-DEBIAN. Der eigentliche Sprung auf v3.0.5 (siehe E-003 fuer die
+# urspruengliche, bewusste Zurueckstellung) folgt danach als eigener
+# PKGBUILD-Bump.
 #
 # Nutzt bewusst das offizielle Release-Tarball statt eines Git-Checkouts:
 # enthaelt bereits ein fertig gebautes Frontend (static/, collectstatic
@@ -31,8 +33,8 @@
 # automatisch bewahrt, kein manuelles Copy-Paste von Secrets noetig
 # (gleicher Mechanismus wie bookstacks .env, siehe E-007).
 pkgname=paperless-ngx
-pkgver=2.20.5
-pkgrel=2
+pkgver=2.20.15
+pkgrel=1
 pkgdesc="A community-supported supercharged document management system: scan, index and archive all your physical documents"
 arch=('amd64')
 distribution=trixie
@@ -67,7 +69,7 @@ depends=(
 makedepends=('python3-venv' 'python3-dev' 'libpq-dev' 'pkg-config')
 source=()
 
-_sha256="730848759f510869448a159b8b9e9718460d51437eacc9db726d14affa11edcf"
+_sha256="e9bfb6ec0425e5e72a85f64811829167b6c22753f83e325b95d5068393073bf6"
 _tarball="paperless-ngx-v${pkgver}.tar.xz"
 _url="https://github.com/paperless-ngx/paperless-ngx/releases/download/v${pkgver}/${_tarball}"
 
