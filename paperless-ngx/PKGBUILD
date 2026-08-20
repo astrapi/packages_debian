@@ -20,9 +20,19 @@
 # braucht es libpq-dev + einen Compiler. Alle anderen kompilier-verdaechtigen
 # Abhaengigkeiten (pikepdf, lxml, numpy, pillow, cryptography, scikit-learn,
 # zxing-cpp) haben bestaetigte cp313-Wheels auf PyPI.
+#
+# Config-Pfad /opt/paperless/paperless.conf statt /etc/paperless.conf
+# (E-009): auf dms.simpsons.lan lief bereits eine bare-metal-Installation
+# mit der Config genau dort. Zusaetzlicher Vorteil neben der reinen
+# Pfadangleichung: als DEBIAN/conffiles-Eintrag markiert (siehe unten)
+# laesst dpkg eine bei der Erstinstallation bereits vorhandene, nicht von
+# dpkg verwaltete Datei an dieser Position unangetastet -- die echten
+# DB-Zugangsdaten/den Secret-Key aus der bestehenden Installation
+# automatisch bewahrt, kein manuelles Copy-Paste von Secrets noetig
+# (gleicher Mechanismus wie bookstacks .env, siehe E-007).
 pkgname=paperless-ngx
 pkgver=2.20.5
-pkgrel=1
+pkgrel=2
 pkgdesc="A community-supported supercharged document management system: scan, index and archive all your physical documents"
 arch=('amd64')
 distribution=trixie
@@ -129,8 +139,8 @@ package() {
     # BASE_DIR.parent/{media,data,static,consume} -- bei
     # WorkingDirectory=/opt/paperless/src trifft das von selbst genau unser
     # Layout.
-    install -Dm640 /dev/null "${pkgdir}/etc/paperless.conf"
-    cat <<'EOF' > "${pkgdir}/etc/paperless.conf"
+    install -Dm640 /dev/null "${pkgdir}/opt/paperless/paperless.conf"
+    cat <<'EOF' > "${pkgdir}/opt/paperless/paperless.conf"
 # paperless-ngx Konfiguration fuer Debian
 # Volle Optionsliste: https://docs.paperless-ngx.com/configuration/
 
@@ -157,6 +167,14 @@ EOF
     # nacktes System-python3/celery), EnvironmentFile ergaenzt, und
     # "Requires=redis.service" -> "Requires=redis-server.service" (der
     # tatsaechliche Debian-Unit-Name, redis.service existiert dort nicht).
+    #
+    # Liegen bewusst unter /usr/lib/systemd/system/ (Paket-verwaltet) statt
+    # /etc/systemd/system/ -- Vorsicht bei einer Migration ueber eine
+    # bestehende manuelle Installation: systemd bevorzugt gleichnamige
+    # Units unter /etc/systemd/system/, die dort ggf. noch von der alten
+    # Installation liegen, gegenueber unseren hier (gleiches Problem wie
+    # bei homepage, siehe T-009-DEBIAN) -- die alten Dateien muessen vor
+    # dem Aktivieren entfernt werden, sonst greifen unsere Units nie.
     install -d "${pkgdir}/usr/lib/systemd/system"
 
     install -Dm644 /dev/null "${pkgdir}/usr/lib/systemd/system/paperless-webserver.service"
@@ -172,7 +190,7 @@ Requires=redis-server.service
 User=paperless
 Group=paperless
 WorkingDirectory=/opt/paperless/src
-EnvironmentFile=/etc/paperless.conf
+EnvironmentFile=/opt/paperless/paperless.conf
 
 Environment=GRANIAN_HOST=::
 Environment=GRANIAN_PORT=8000
@@ -215,7 +233,7 @@ Requires=redis-server.service
 User=paperless
 Group=paperless
 WorkingDirectory=/opt/paperless/src
-EnvironmentFile=/etc/paperless.conf
+EnvironmentFile=/opt/paperless/paperless.conf
 ExecStart=/opt/paperless/venv/bin/python3 manage.py document_consumer
 Restart=on-failure
 
@@ -234,7 +252,7 @@ Requires=redis-server.service
 User=paperless
 Group=paperless
 WorkingDirectory=/opt/paperless/src
-EnvironmentFile=/etc/paperless.conf
+EnvironmentFile=/opt/paperless/paperless.conf
 ExecStart=/opt/paperless/venv/bin/celery --app paperless worker --loglevel INFO
 Restart=on-failure
 
@@ -253,7 +271,7 @@ Requires=redis-server.service
 User=paperless
 Group=paperless
 WorkingDirectory=/opt/paperless/src
-EnvironmentFile=/etc/paperless.conf
+EnvironmentFile=/opt/paperless/paperless.conf
 ExecStart=/opt/paperless/venv/bin/celery --app paperless beat --loglevel INFO
 Restart=on-failure
 
@@ -268,6 +286,14 @@ EOF
     # bei einem Reinstall/Upgrade idempotent, ueberschreibt keinen bereits
     # gesetzten echten Wert).
     install -d "${pkgdir}/DEBIAN"
+
+    # paperless.conf als Conffile: laesst dpkg eine bei der Erstinstallation
+    # bereits vorhandene, nicht von dpkg verwaltete Datei an dieser Position
+    # unangetastet (siehe Kommentar am Dateianfang) -- kritisch fuer die
+    # Migration von der bare-metal-Installation, deren echte Config sonst
+    # durch den Platzhalter oben ueberschrieben wuerde.
+    echo "/opt/paperless/paperless.conf" > "${pkgdir}/DEBIAN/conffiles"
+
     cat > "${pkgdir}/DEBIAN/postinst" << 'EOF'
 #!/bin/sh
 set -e
@@ -280,23 +306,29 @@ install -d -o paperless -g paperless /opt/paperless/data
 install -d -o paperless -g paperless /opt/paperless/consume
 install -d -o paperless -g paperless /opt/paperless/export
 
-chown root:paperless /etc/paperless.conf
-chmod 640 /etc/paperless.conf
+chown paperless:paperless /opt/paperless/paperless.conf
+chmod 640 /opt/paperless/paperless.conf
 
-if grep -q '^PAPERLESS_SECRET_KEY=change-me$' /etc/paperless.conf; then
+if grep -q '^PAPERLESS_SECRET_KEY=change-me$' /opt/paperless/paperless.conf; then
     _key=$(head -c 48 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 64)
-    sed -i "s/^PAPERLESS_SECRET_KEY=change-me\$/PAPERLESS_SECRET_KEY=${_key}/" /etc/paperless.conf
+    sed -i "s/^PAPERLESS_SECRET_KEY=change-me\$/PAPERLESS_SECRET_KEY=${_key}/" /opt/paperless/paperless.conf
 fi
 
 cat <<'MSG'
 paperless-ngx installiert, aber noch nicht startklar:
-  1. /etc/paperless.conf ausfuellen (mindestens PAPERLESS_DBPASS)
+  1. Falls dies eine frische Installation ist (keine bestehende Config
+     uebernommen): /opt/paperless/paperless.conf ausfuellen (mindestens
+     PAPERLESS_DBPASS)
   2. PostgreSQL-Rolle + Datenbank anlegen (Name/User/Passwort aus
-     /etc/paperless.conf)
+     /opt/paperless/paperless.conf), falls noch nicht vorhanden
   3. Erstes Migrate:
      sudo -u paperless /opt/paperless/venv/bin/python3 \
        /opt/paperless/src/manage.py migrate
-  4. Dienste aktivieren:
+  4. Falls von einer manuellen Installation migriert: alte, gleichnamige
+     Units unter /etc/systemd/system/paperless-*.service pruefen und bei
+     Bedarf entfernen (die haben Vorrang vor unseren unter
+     /usr/lib/systemd/system/) -- dann "systemctl daemon-reload"
+  5. Dienste aktivieren:
      systemctl enable --now paperless-webserver paperless-consumer \
        paperless-task-queue paperless-scheduler
 MSG
