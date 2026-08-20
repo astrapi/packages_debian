@@ -1,13 +1,51 @@
 # Maintainer: Michael Otto <michael@astrapi.de>
 #
-# v2.20.15 statt v2.20.5: reines Sicherheits-/Bugfix-Release (u.a.
-# GHSA-8c6x-pfjq-9gr7), keine Breaking Changes/Logikaenderung noetig --
-# aber ein zwingender Zwischenschritt: laut offiziellem
-# docs/migration-v3.md ist ein Upgrade auf v3.0 NUR ab genau v2.20.15
-# moeglich, nicht ab einer beliebigen 2.20.x-Version. Siehe
-# T-015-DEBIAN. Der eigentliche Sprung auf v3.0.5 (siehe E-003 fuer die
-# urspruengliche, bewusste Zurueckstellung) folgt danach als eigener
-# PKGBUILD-Bump.
+# v3.0.5 (Kurskorrektur von E-003, das sich am 14.08. noch bewusst gegen
+# v3.0.5 entschied): Breaking Changes einzeln anhand des offiziellen
+# docs/migration-v3.md gegen die reale Config auf dms.simpsons.lan
+# geprueft -- die meisten betreffen uns nicht oder nur harmlos, drei
+# erfordern aber echtes Handeln (siehe naechster Kommentarblock).
+#
+# WICHTIG -- Upstream erlaubt laut docs/migration-v3.md ausdruecklich
+# NUR ein Upgrade ab v2.20.15 ("Upgrading to Paperless-ngx v3 can only be
+# performed from version 2.20.15"), nicht ab einer beliebigen 2.20.x-
+# Version. Die zuvor deployte v2.20.5 (T-013-DEBIAN) muss deshalb VOR
+# diesem Paket erst auf v2.20.15 aktualisiert werden (eigener,
+# minimaler Zwischenschritt, bereits als eigener Commit vorbereitet,
+# siehe Git-History -- v2.20.15 ist ein reines Sicherheits-/
+# Bugfix-Release).
+#
+# Drei Punkte aus migration-v3.md, die auf dms.simpsons.lan tatsaechlich
+# Handeln erfordern (nicht nur aus den PR-Titeln ableitbar, erst im
+# ausfuehrlichen Guide gefunden):
+#   1. PAPERLESS_DBENGINE ist jetzt Pflicht (vorher aus PAPERLESS_DBHOST
+#      hergeleitet) -- unser Config-Template setzt das zwar bereits,
+#      aber die ECHTE, per Conffile bewahrte Config auf dms.simpsons.lan
+#      hat es nicht gesetzt (dort lief bisher v2, wo es optional war) --
+#      muss beim Deploy manuell ergaenzt werden.
+#   2. Volltextsuche-Migration (Whoosh->Tantivy): baut sich bei
+#      Docker-Installationen automatisch beim Start neu auf, bei
+#      bare-metal-Installationen (wie dieser hier) NICHT -- laut
+#      Doku manuell noetig: "python3 manage.py document_index reindex
+#      --if-needed" nach jedem Upgrade. In der postinst-Ausgabe unten
+#      ergaenzt.
+#   3. Reverse-Proxy-Login-Rate-Limiting (allauth-Client-IP-Ermittlung
+#      geaendert) kann hinter einem Reverse-Proxy zu 403 Forbidden beim
+#      Login fuehren -- betrifft uns, da dieses Paket ueblicherweise
+#      hinter lokalem Caddy laeuft (siehe E-009). Deshalb
+#      PAPERLESS_TRUSTED_PROXIES=127.0.0.1 neu im Config-Template aktiv
+#      gesetzt (nicht nur als Kommentar), da praktisch jede Installation
+#      dieses Pakets so reverse-proxied wird.
+#
+# Nebenfund beim tatsaechlichen Bau (nicht aus migration-v3.md ableitbar):
+# das .deb waechst von ~224 MB auf ~553 MB. Grund: das neue "Paperless
+# AI"-Feature (semantische Suche/Vorschlaege ueber Ollama/OpenAI) hat
+# torch/transformers/sentence-transformers/llama-index-* etc. als
+# **Kern**-Abhaengigkeiten in pyproject.toml eingetragen (nicht als
+# optionale Extra wie z.B. "mariadb", also nicht per awk-Filter wie bei
+# mysqlclient entfernbar, ohne das Startverhalten zu riskieren) --
+# bewusst so belassen (Nutzerentscheidung), die KI-Features sind
+# standardmaessig deaktiviert, nur der Plattenplatzbedarf steigt.
 #
 # Nutzt bewusst das offizielle Release-Tarball statt eines Git-Checkouts:
 # enthaelt bereits ein fertig gebautes Frontend (static/, collectstatic
@@ -16,7 +54,7 @@
 #
 # Braucht ein dediziertes Docker-Image (ctl/debian-builder-python statt
 # ctl/debian-builder, siehe E-003): "requirements.txt" pinnt
-# psycopg-c==3.2.12, PyPI hat dafuer nur fuer cp312+x86_64/aarch64 ein
+# psycopg-c==3.3.0, PyPI hat dafuer nur fuer cp312+x86_64/aarch64 ein
 # eigenes (von paperless-ngx selbst gehostetes) Wheel -- unter Debian
 # trixies python3 (3.13) baut pip das Paket also aus Quelltext, dafuer
 # braucht es libpq-dev + einen Compiler. Alle anderen kompilier-verdaechtigen
@@ -33,7 +71,7 @@
 # automatisch bewahrt, kein manuelles Copy-Paste von Secrets noetig
 # (gleicher Mechanismus wie bookstacks .env, siehe E-007).
 pkgname=paperless-ngx
-pkgver=2.20.15
+pkgver=3.0.5
 pkgrel=1
 pkgdesc="A community-supported supercharged document management system: scan, index and archive all your physical documents"
 arch=('amd64')
@@ -41,6 +79,10 @@ distribution=trixie
 url="https://docs.paperless-ngx.com"
 license=('GPL-3.0-only')
 depends=(
+    # libzbar0 seit v3.0 nicht mehr noetig -- pyzbar-Barcode-Backend
+    # entfernt (siehe Kommentar am Dateianfang), zxing-cpp (reine
+    # Python-Abhaengigkeit im venv, kein System-Paket) ist jetzt der
+    # einzige Backend.
     'python3'
     'redis-server'
     'postgresql'
@@ -61,7 +103,6 @@ depends=(
     'imagemagick'
     'fonts-liberation'
     'libmagic1'
-    'libzbar0'
     'gnupg'
 )
 # Dokumentarisch -- jobs.py wertet makedepends nicht aus, kommen fest aus
@@ -69,7 +110,7 @@ depends=(
 makedepends=('python3-venv' 'python3-dev' 'libpq-dev' 'pkg-config')
 source=()
 
-_sha256="e9bfb6ec0425e5e72a85f64811829167b6c22753f83e325b95d5068393073bf6"
+_sha256="d45500dfb4624e72913ecb12fe7d71c2d4d17abeb2406b65054bff728eda5bd1"
 _tarball="paperless-ngx-v${pkgver}.tar.xz"
 _url="https://github.com/paperless-ngx/paperless-ngx/releases/download/v${pkgver}/${_tarball}"
 
@@ -161,6 +202,14 @@ PAPERLESS_TIME_ZONE=Europe/Berlin
 PAPERLESS_OCR_LANGUAGE=deu
 PAPERLESS_OCR_LANGUAGES=eng fra ita spa
 
+# Reverse-Proxy-Login-Rate-Limiting (allauth) seit v3 auf explizite
+# Trusted-Proxy-Liste umgestellt, sonst drohen 403 Forbidden beim Login
+# hinter einem Reverse-Proxy. Dieses Paket wird ueblicherweise hinter
+# lokalem Caddy betrieben (siehe E-009) -- deshalb aktiv statt nur als
+# Kommentar. Bei abweichendem Setup (kein lokaler Reverse-Proxy)
+# entfernen.
+PAPERLESS_TRUSTED_PROXIES=127.0.0.1
+
 # PAPERLESS_URL=https://paperless.example.com
 EOF
 
@@ -203,7 +252,7 @@ ExecStart=/bin/sh -c '\
   [ -n "$PAPERLESS_PORT" ] && export GRANIAN_PORT=$PAPERLESS_PORT; \
   [ -n "$PAPERLESS_WEBSERVER_WORKERS" ] && export GRANIAN_WORKERS=$PAPERLESS_WEBSERVER_WORKERS; \
   [ -n "$PAPERLESS_FORCE_SCRIPT_NAME" ] && export GRANIAN_URL_PATH_PREFIX=$PAPERLESS_FORCE_SCRIPT_NAME; \
-  exec /opt/paperless/venv/bin/granian --interface asginl --ws "paperless.asgi:application"'
+  exec /opt/paperless/venv/bin/granian --interface asginl --ws --loop uvloop "paperless.asgi:application"'
 Restart=on-failure
 
 [Install]
@@ -316,21 +365,37 @@ if grep -q '^PAPERLESS_SECRET_KEY=change-me$' /opt/paperless/paperless.conf; the
     sed -i "s/^PAPERLESS_SECRET_KEY=change-me\$/PAPERLESS_SECRET_KEY=${_key}/" /opt/paperless/paperless.conf
 fi
 
+# systemd merkt jeden dpkg-Schreibvorgang auf die Unit-Dateien als
+# "changed on disk" (auch bei inhaltlich identischem Neuschreiben) und
+# verweigert sonst den naechsten restart/enable mit einer Warnung, bis
+# manuell "daemon-reload" ausgefuehrt wird -- Standard-Praxis bei
+# Debian-Paketen mit eigenen Units, deshalb automatisiert statt als
+# manueller Schritt fuer den Nutzer.
+systemctl daemon-reload 2>/dev/null || true
+
 cat <<'MSG'
 paperless-ngx installiert, aber noch nicht startklar:
   1. Falls dies eine frische Installation ist (keine bestehende Config
      uebernommen): /opt/paperless/paperless.conf ausfuellen (mindestens
      PAPERLESS_DBPASS)
-  2. PostgreSQL-Rolle + Datenbank anlegen (Name/User/Passwort aus
+  2. Falls von v2.x migriert: PAPERLESS_DBENGINE=postgresql (oder
+     mariadb) in /opt/paperless/paperless.conf pruefen/ergaenzen --
+     seit v3 Pflicht, vorher aus PAPERLESS_DBHOST hergeleitet und in
+     aelteren Configs oft nicht gesetzt
+  3. PostgreSQL-Rolle + Datenbank anlegen (Name/User/Passwort aus
      /opt/paperless/paperless.conf), falls noch nicht vorhanden
-  3. Erstes Migrate:
+  4. Erstes Migrate:
      sudo -u paperless /opt/paperless/venv/bin/python3 \
        /opt/paperless/src/manage.py migrate
-  4. Falls von einer manuellen Installation migriert: alte, gleichnamige
+  5. Volltextsuche-Index (Whoosh->Tantivy seit v3, baut sich bei
+     bare-metal-Installationen wie dieser NICHT automatisch neu auf):
+     sudo -u paperless /opt/paperless/venv/bin/python3 \
+       /opt/paperless/src/manage.py document_index reindex --if-needed
+  6. Falls von einer manuellen Installation migriert: alte, gleichnamige
      Units unter /etc/systemd/system/paperless-*.service pruefen und bei
      Bedarf entfernen (die haben Vorrang vor unseren unter
      /usr/lib/systemd/system/) -- dann "systemctl daemon-reload"
-  5. Dienste aktivieren:
+  7. Dienste aktivieren:
      systemctl enable --now paperless-webserver paperless-consumer \
        paperless-task-queue paperless-scheduler
 MSG
