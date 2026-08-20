@@ -13,13 +13,21 @@
 # sind. Debian trixies php 8.4 erfuellt die Versionsvorgabe ohne Weiteres,
 # kein exotisches Basis-Image wie bei vaultwarden/Rust noetig.
 #
-# Abweichung von E-004 (mod_php statt FPM, /opt statt /var/www, www-data
-# statt eigenem User): auf wiki.simpsons.lan lief bereits eine bare-metal
-# BookStack-Installation genau in dieser Konfiguration (fertiger
-# Apache-vhost mit TLS, mod_php, /opt/bookstack, www-data:www-data). Das
-# Paket wurde bewusst an dieses bestehende Setup angeglichen statt
-# umgekehrt den laufenden vhost umzubauen, um die Migration auf einen
-# reinen Datei-/DB-Wechsel zu reduzieren. Siehe E-007.
+# Abweichung von E-004 (urspruenglich: FPM, /var/www, eigener User):
+# auf wiki.simpsons.lan lief bereits eine bare-metal BookStack-Installation
+# unter /opt/bookstack mit www-data-Ownership -- das Paket wurde daran
+# angeglichen (E-007) und blieb dabei auch nach dem Wechsel auf Caddy
+# (E-008, siehe naechster Absatz) unveraendert bei /opt + www-data.
+#
+# Web-/PHP-Unterbau seit E-008: Caddy + PHP-FPM statt Apache + mod_php
+# (E-007-Zwischenstand). Grund: der Rest der Simpsons-Infrastruktur laeuft
+# bereits hinter Caddy (automatisches HTTPS, ein Prozess pro Host), Apache
+# war nur bei bookstack ein Einzelfall aus der uebernommenen bare-metal-
+# Installation. Caddys eigenes Debian-Paket legt beim Installieren einen
+# System-User "caddy" an und fuegt ihn automatisch der Gruppe "www-data"
+# hinzu (verifiziert im echten .deb von deb.caddyserver.com/dl.cloudsmith.io,
+# postinst) -- der FPM-Pool-Socket kann deshalb einfach www-data:www-data
+# gehoeren, kein separates listen.owner=caddy noetig.
 #
 # .env ist als DEBIAN/conffiles-Eintrag markiert: bei der Erstinstallation
 # dieses Pakets ueber eine bereits vorhandene manuelle Installation
@@ -29,18 +37,20 @@
 # durch den Platzhalter-Inhalt unten ueberschrieben. Nur bei einer
 # wirklich frischen Installation (keine Datei vorhanden) greift der
 # Platzhalter, der postinst-Trigger fuer key:generate bleibt darauf
-# abgestimmt.
+# abgestimmt. Die mitgelieferte Caddy-Site-Datei ist ebenfalls ein
+# Conffile, aus demselben Grund (lokale Anpassungen sollen bei Upgrades
+# nicht klaglos ueberschrieben werden).
 pkgname=bookstack
 pkgver=26.05.3
-pkgrel=2
+pkgrel=3
 pkgdesc="BookStack is a simple, self-hosted, easy-to-use platform for organising and storing information (wiki)"
 arch=('amd64')
 distribution=trixie
 url="https://www.bookstackapp.com"
 license=('MIT')
 depends=(
-    'apache2'
-    'libapache2-mod-php8.4'
+    'caddy'
+    'php8.4-fpm'
     'php8.4-cli'
     'php8.4-curl'
     'php8.4-xml'
@@ -131,14 +141,60 @@ MAIL_PASSWORD=null
 MAIL_ENCRYPTION=null
 EOF
 
+    # PHP-FPM-Pool (Ersatz fuer mod_php seit E-008): das bereits laufende
+    # System-php8.4-fpm liest pool.d/*.conf automatisch ein. Socket
+    # www-data:www-data statt caddy:caddy -- Caddys eigenes postinst fuegt
+    # den User "caddy" bereits automatisch der Gruppe "www-data" hinzu
+    # (siehe Kommentar am Dateianfang), damit muss hier nichts Zusaetzliches
+    # fuer die Socket-Berechtigung getan werden.
+    install -Dm644 /dev/null "${pkgdir}/etc/php/8.4/fpm/pool.d/bookstack.conf"
+    cat <<'EOF' > "${pkgdir}/etc/php/8.4/fpm/pool.d/bookstack.conf"
+[bookstack]
+user = www-data
+group = www-data
+listen = /run/php/bookstack.sock
+listen.owner = www-data
+listen.group = www-data
+listen.mode = 0660
+
+pm = dynamic
+pm.max_children = 5
+pm.start_servers = 2
+pm.min_spare_servers = 1
+pm.max_spare_servers = 3
+
+php_admin_value[error_log] = /opt/bookstack/storage/logs/fpm-error.log
+php_admin_flag[log_errors] = on
+EOF
+
+    # Caddy-Site-Snippet (E-008, Nutzerentscheidung: fertige Config statt
+    # nur FPM-Unterbau) -- TLS-Zertifikatpfade nach dem auf anderen
+    # Simpsons-Hosts bereits etablierten Muster (/etc/caddy/<domain>.crt/
+    # .key, siehe z.B. packages.simpsons.lan). php_fastcgi uebernimmt die
+    # komplette Laravel-Front-Controller-Logik (Rewrite auf index.php)
+    # automatisch -- kein manuelles RewriteRule-Gebastel mehr wie frueher
+    # im Apache-vhost.
+    install -Dm644 /dev/null "${pkgdir}/etc/caddy/sites-enabled/bookstack.caddy"
+    cat <<'EOF' > "${pkgdir}/etc/caddy/sites-enabled/bookstack.caddy"
+wiki.simpsons.lan {
+	tls /etc/caddy/simpsons.lan.crt /etc/caddy/simpsons.lan.key
+
+	root * /opt/bookstack/public
+	php_fastcgi unix//run/php/bookstack.sock
+	file_server
+}
+EOF
+
     install -d "${pkgdir}/DEBIAN"
 
-    # .env als Conffile: laesst dpkg eine bei der Erstinstallation bereits
-    # vorhandene, nicht von dpkg verwaltete Datei an dieser Position
-    # unangetastet (siehe Kommentar am Dateianfang) -- kritisch fuer die
-    # Migration von der bare-metal-Installation, deren echte .env sonst
-    # durch den Platzhalter oben ueberschrieben wuerde.
-    echo "/opt/bookstack/.env" > "${pkgdir}/DEBIAN/conffiles"
+    # .env + Caddy-Site-Datei als Conffiles: laesst dpkg eine bei der
+    # Erstinstallation bereits vorhandene, nicht von dpkg verwaltete Datei
+    # an dieser Position unangetastet (siehe Kommentar am Dateianfang) --
+    # kritisch fuer die .env bei der Migration von der bare-metal-
+    # Installation, bei der Caddy-Datei zusaetzlich fuer lokale Anpassungen
+    # bei kuenftigen Paket-Upgrades.
+    printf '/opt/bookstack/.env\n/etc/caddy/sites-enabled/bookstack.caddy\n' \
+        > "${pkgdir}/DEBIAN/conffiles"
 
     cat > "${pkgdir}/DEBIAN/postinst" << 'EOF'
 #!/bin/sh
@@ -154,8 +210,8 @@ if grep -q '^APP_KEY=SomeRandomString$' /opt/bookstack/.env; then
     php8.4 /opt/bookstack/artisan key:generate --force --ansi
 fi
 
-a2enmod php8.4 2>/dev/null || true
-systemctl reload apache2 2>/dev/null || true
+systemctl reload php8.4-fpm 2>/dev/null || true
+systemctl reload caddy 2>/dev/null || true
 
 cat <<'MSG'
 BookStack installiert, aber noch nicht startklar:
@@ -166,8 +222,13 @@ BookStack installiert, aber noch nicht startklar:
      falls noch nicht vorhanden
   3. Erstes Migrate:
      sudo -u www-data php8.4 /opt/bookstack/artisan migrate --force
-  4. Apache-vhost selbst einrichten/pruefen: DocumentRoot auf
-     /opt/bookstack/public (Paket richtet bewusst keinen vhost ein)
+  4. Caddy-Site-Datei /etc/caddy/sites-enabled/bookstack.caddy ist
+     angelegt, aber noch NICHT automatisch aktiv -- in der Haupt-
+     /etc/caddy/Caddyfile einmalig ergaenzen (falls noch nicht
+     vorhanden):
+       import /etc/caddy/sites-enabled/*.caddy
+     Domain/TLS-Zertifikatpfade im Snippet bei Bedarf anpassen, danach
+     systemctl reload caddy
   5. Falls von v25.x aktualisiert: storage/fonts-Rechte pruefen
      (PDF-Export, seit v26.05 geaendert) und SMTP-Versand testen
      (Einstellungen > Wartung > Test-E-Mail senden)
