@@ -55,6 +55,11 @@ MINISERVE_PATH=/opt/paperless/media/documents
 MINISERVE_PORT=8080
 MINISERVE_INTERFACE=172.19.19.4
 
+MINISERVE_COLOR_SCHEME=ayu-dark
+MINISERVE_DIRS_FIRST=true
+MINISERVE_HIDE_VERSION_FOOTER=true
+MINISERVE_HIDE_THEME_SELECTOR=true
+
 # Optional: Basic-Auth aktivieren (Format user:password oder
 # user:sha256:<hash>/user:sha512:<hash>), standardmaessig aus:
 # MINISERVE_AUTH=user:password
