@@ -159,7 +159,23 @@ build() {
 
     # NLTK-Sprachdaten fuer die Volltextsuche, gleiche drei Pakete wie im
     # offiziellen Dockerfile (Zeile "Installing NLTK data").
-    "${srcdir}/venv/bin/python3" -W ignore::RuntimeWarning -m nltk.downloader \
+    #
+    # NLTK_DATA muss zusaetzlich zu "-d" gesetzt werden: das pinnte
+    # nltk==3.10.0 (siehe requirements.txt) hat einen neuen
+    # I/O-Sicherheits-Sentinel (nltk/pathsec.py, ENFORCE=True per Default)
+    # bekommen, der Downloads nur noch in eine feste Allowlist erlaubt
+    # (~/nltk_data, /usr/share/nltk_data, System-Tempdir, oder was in
+    # nltk.data.path/NLTK_DATA steht) -- "-d" allein legt zwar das
+    # Download-Verzeichnis fest, macht es aber NICHT automatisch zu einer
+    # erlaubten Wurzel. Lokal reproduziert: identischer Aufruf unter /tmp
+    # (im System-Tempdir, also implizit erlaubt) funktioniert anstandslos,
+    # derselbe Aufruf mit einem srcdir ausserhalb von /tmp (wie im echten
+    # Build-Container, "/build/src/...") scheitert exakt mit der
+    # gemeldeten "Security Violation [Downloader._download_package]:
+    # Unauthorized path"-Fehlermeldung. Mit NLTK_DATA=dasselbe
+    # Zielverzeichnis wird es Teil der Allowlist, Downloads laufen durch.
+    NLTK_DATA="${srcdir}/nltk_data" "${srcdir}/venv/bin/python3" \
+        -W ignore::RuntimeWarning -m nltk.downloader \
         -d "${srcdir}/nltk_data" snowball_data stopwords punkt_tab
 }
 
