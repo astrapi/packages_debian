@@ -36,6 +36,16 @@
 # unser astrapi, weil dessen @media-Block textuell nach unserem im
 # generierten Stylesheet steht.
 #
+# pkgrel 6: Zweiter Kaskaden-Bug derselben Art, ebenfalls live auf
+# dms.simpsons.lan aufgefallen -- die ".title-search-box { display:
+# none }"-Regel aus pkgrel 5 stand VOR der eigentlichen Upstream-
+# Definition ".title-search-box { display: flex; ... }" weiter unten in
+# style.scss. Bei gleicher Spezifitaet gewinnt die zuletzt deklarierte
+# Regel, die spaetere Upstream-Regel ueberschrieb unser "display: none"
+# also wieder. Fix: kompletten Astrapi-Anpassungsblock ans Dateiende
+# verschoben (nach der letzten Upstream-Regel), damit er garantiert
+# zuletzt gewinnt.
+#
 # Braucht ein dediziertes Docker-Image (ctl/debian-builder-rust statt
 # ctl/debian-builder, gleicher Grund wie bei vaultwarden/PKGBUILD):
 # der Standard-Image hat kein cargo/rustc. miniserve selbst braucht
@@ -61,7 +71,7 @@
 # die hinter Caddy laufen. depends=('caddy') ergaenzt.
 pkgname=miniserve
 pkgver=0.35.0
-pkgrel=5
+pkgrel=6
 pkgdesc="Minimalistischer, schreibgeschuetzter HTTP-Dateiserver (astrapi-Theme) -- hier als Werkzeug zum Durchstoebern der paperless-ngx-Dokumentenablage"
 arch=('amd64')
 distribution=trixie
