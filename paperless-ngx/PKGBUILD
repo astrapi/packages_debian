@@ -1,5 +1,13 @@
 # Maintainer: Michael Otto <michael@astrapi.de>
 #
+# pkgrel 2: liefert jetzt eine fertige Caddy-Site-Datei
+# (/etc/caddy/sites-enabled/paperless-ngx.caddy) statt den Reverse-Proxy
+# ausschliesslich Hand-editiert in der Haupt-Caddyfile zu pflegen --
+# gleiches Muster wie bookstack (E-008) und miniserve, auf Nutzerwunsch
+# jetzt Konvention fuer alle Pakete hinter Caddy. depends=('caddy')
+# ergaenzt. Domain/Proxy-Ziel unveraendert vom bisherigen, Hand-
+# gepflegten Block auf dms.simpsons.lan uebernommen.
+#
 # v3.0.5 (Kurskorrektur von E-003, das sich am 14.08. noch bewusst gegen
 # v3.0.5 entschied): Breaking Changes einzeln anhand des offiziellen
 # docs/migration-v3.md gegen die reale Config auf dms.simpsons.lan
@@ -72,7 +80,7 @@
 # (gleicher Mechanismus wie bookstacks .env, siehe E-007).
 pkgname=paperless-ngx
 pkgver=3.0.5
-pkgrel=1
+pkgrel=2
 pkgdesc="A community-supported supercharged document management system: scan, index and archive all your physical documents"
 arch=('amd64')
 distribution=trixie
@@ -104,6 +112,7 @@ depends=(
     'fonts-liberation'
     'libmagic1'
     'gnupg'
+    'caddy'
 )
 # Dokumentarisch -- jobs.py wertet makedepends nicht aus, kommen fest aus
 # ctl/debian-builder-python (siehe E-003).
@@ -347,6 +356,20 @@ WantedBy=multi-user.target
 EOF
     chmod 644 "${pkgdir}/usr/lib/systemd/system/paperless-scheduler.service"
 
+    # Caddy-Site-Snippet (gleiches Muster wie bookstack/E-008 und
+    # miniserve): bisher lief der Reverse-Proxy fuer dieses Paket als
+    # Hand-editierter Block direkt in der Haupt-/etc/caddy/Caddyfile auf
+    # dms.simpsons.lan -- jetzt als eigene, paketverwaltete Datei unter
+    # sites-enabled/. Domain/TLS-Zertifikatpfad unveraendert vom
+    # bestehenden Block uebernommen.
+    install -Dm644 /dev/null "${pkgdir}/etc/caddy/sites-enabled/paperless-ngx.caddy"
+    cat <<'EOF' > "${pkgdir}/etc/caddy/sites-enabled/paperless-ngx.caddy"
+dms.simpsons.lan {
+	reverse_proxy 127.0.0.1:8000
+	tls /etc/caddy/simpsons.lan.crt /etc/caddy/simpsons.lan.key
+}
+EOF
+
     # Dedizierter System-User + Daten-/Medienverzeichnisse -- gleiches Muster
     # wie vaultwarden/homepage. PAPERLESS_SECRET_KEY wird beim ersten
     # Postinst-Lauf generiert, solange noch der Platzhalter drinsteht (auch
@@ -354,12 +377,17 @@ EOF
     # gesetzten echten Wert).
     install -d "${pkgdir}/DEBIAN"
 
-    # paperless.conf als Conffile: laesst dpkg eine bei der Erstinstallation
-    # bereits vorhandene, nicht von dpkg verwaltete Datei an dieser Position
-    # unangetastet (siehe Kommentar am Dateianfang) -- kritisch fuer die
-    # Migration von der bare-metal-Installation, deren echte Config sonst
-    # durch den Platzhalter oben ueberschrieben wuerde.
-    echo "/opt/paperless/paperless.conf" > "${pkgdir}/DEBIAN/conffiles"
+    # paperless.conf + Caddy-Site-Datei als Conffiles: laesst dpkg eine bei
+    # der Erstinstallation bereits vorhandene, nicht von dpkg verwaltete
+    # Datei an dieser Position unangetastet (siehe Kommentar am
+    # Dateianfang) -- kritisch fuer die Migration von der bare-metal-
+    # Installation, deren echte Config sonst durch den Platzhalter oben
+    # ueberschrieben wuerde. Fuer sites-enabled/paperless-ngx.caddy gibt es
+    # (noch) keine vorherige, dpkg-fremde Datei an genau diesem Pfad --
+    # trotzdem als Conffile markiert, damit spaetere lokale Anpassungen bei
+    # einem Upgrade nicht stillschweigend ueberschrieben werden.
+    printf '/opt/paperless/paperless.conf\n/etc/caddy/sites-enabled/paperless-ngx.caddy\n' \
+        > "${pkgdir}/DEBIAN/conffiles"
 
     cat > "${pkgdir}/DEBIAN/postinst" << 'EOF'
 #!/bin/sh
@@ -388,6 +416,7 @@ fi
 # Debian-Paketen mit eigenen Units, deshalb automatisiert statt als
 # manueller Schritt fuer den Nutzer.
 systemctl daemon-reload 2>/dev/null || true
+systemctl reload caddy 2>/dev/null || true
 
 cat <<'MSG'
 paperless-ngx installiert, aber noch nicht startklar:
@@ -414,6 +443,15 @@ paperless-ngx installiert, aber noch nicht startklar:
   7. Dienste aktivieren:
      systemctl enable --now paperless-webserver paperless-consumer \
        paperless-task-queue paperless-scheduler
+  8. Caddy-Site-Datei /etc/caddy/sites-enabled/paperless-ngx.caddy ist
+     angelegt, aber noch NICHT automatisch aktiv -- in der Haupt-
+     /etc/caddy/Caddyfile einmalig ergaenzen (falls noch nicht
+     vorhanden):
+       import /etc/caddy/sites-enabled/*.caddy
+     WICHTIG bei Migration von einer Hand-editierten Haupt-Caddyfile:
+     einen dort ggf. schon vorhandenen "dms.simpsons.lan { ... }"-Block
+     VORHER entfernen, sonst kollidieren zwei Site-Definitionen fuer
+     denselben Host. Danach systemctl reload caddy
 MSG
 EOF
     chmod 755 "${pkgdir}/DEBIAN/postinst"
