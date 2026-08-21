@@ -10,9 +10,26 @@
 # schreibgeschuetzt (Upload/Loeschen nur mit explizitem
 # "--upload-files"-Flag, hier bewusst nicht gesetzt).
 #
-# musl- statt gnu-Build: vollstatisch (keine libc-Versionsabhaengigkeit
-# zum Zielsystem), gleiches Prinzip wie filebrowser/vaultwarden-web-
-# vault -- kein Build noetig, nur Download + Checksum.
+# pkgrel 2: Baut ab hier aus dem Quellcode statt des fertigen Release-
+# Binarys -- eigenes "astrapi"-Farbschema (astrapi.scss) plus zwei
+# kleine Patches an style.scss (Titel-/Suchzeile ausblenden, schlanke
+# einfarbige Ordner-/Datei-Icons statt bunter Emoji) und renderer.rs
+# (Theme in Rust-seitiger ThemeSlug-Enum + Picker-Liste registrieren).
+# Farben 1:1 aus astrapi-hub/library/design-tokens.md uebernommen
+# (Dark-Mode-Palette: --bg #101010, --text #f4f4f5, --b #2563eb als
+# Akzent -- Akzentfarbe bewusst NICHT fuer Datei-/Ordner-Linktext
+# verwendet, im echten astrapi-hub-UI sind Listeneintraege schlicht
+# hell auf dunkler Karte, kein blauer Linktext). Kein fester Titel
+# (MINISERVE_TITLE bewusst nicht gesetzt): das Paket soll sich auch
+# fuer andere Verzeichnisse/Hosts wiederverwenden lassen, daher blendet
+# astrapi.scss die ganze Titel-/Suchzeile aus statt sie zu befuellen.
+#
+# Braucht ein dediziertes Docker-Image (ctl/debian-builder-rust statt
+# ctl/debian-builder, gleicher Grund wie bei vaultwarden/PKGBUILD):
+# der Standard-Image hat kein cargo/rustc. miniserve selbst braucht
+# keine System-Bibliotheken (reines Rust/rustls, kein OpenSSL-Binding),
+# das groessere Rust-Image passt trotzdem, weil es schon im Repo
+# gecacht ist.
 #
 # Laeuft als User "paperless" statt eines eigenen dedizierten
 # System-Users: braucht Lesezugriff auf /opt/paperless/media/documents,
@@ -25,25 +42,40 @@
 # -- reiner Werkzeugtausch, gleiche Betriebsparameter.
 pkgname=miniserve
 pkgver=0.35.0
-pkgrel=1
-pkgdesc="Minimalistischer, schreibgeschuetzter HTTP-Dateiserver -- hier als Werkzeug zum Durchstoebern der paperless-ngx-Dokumentenablage"
+pkgrel=2
+pkgdesc="Minimalistischer, schreibgeschuetzter HTTP-Dateiserver (astrapi-Theme) -- hier als Werkzeug zum Durchstoebern der paperless-ngx-Dokumentenablage"
 arch=('amd64')
 distribution=trixie
 url="https://github.com/svenstaro/miniserve"
 license=('MIT')
 depends=('paperless-ngx')
-makedepends=('curl')
-source=()
+makedepends=('cargo' 'rustc') # Dokumentarisch -- kommen fest aus ctl/debian-builder-rust
+source=('astrapi.scss' 'style.scss' 'renderer.rs')
 
-_sha256="c630ee030d5d9d83c88c5cc72f43ae215b0c214d64fd7afc92244fe369af2964"
-_binary="miniserve-${pkgver}-x86_64-unknown-linux-musl"
-_url="https://github.com/svenstaro/miniserve/releases/download/v${pkgver}/${_binary}"
+_sha256="8ae108c161f2ed740f8c4b4dfd0a80805adcbaf7a05a6128f2b4d8f5093f5490"
+_tarball="miniserve-${pkgver}.tar.gz"
+_url="https://github.com/svenstaro/miniserve/archive/refs/tags/v${pkgver}.tar.gz"
+
+build() {
+    curl -fSL --retry 3 --retry-delay 2 -o "${_tarball}" "${_url}"
+    echo "${_sha256}  ${_tarball}" | sha256sum -c -
+    tar -xzf "${_tarball}"
+
+    cd "${srcdir}/miniserve-${pkgver}"
+    cp "${srcdir}/astrapi.scss" data/themes/astrapi.scss
+    cp "${srcdir}/style.scss" data/style.scss
+    cp "${srcdir}/renderer.rs" src/renderer.rs
+
+    cargo build --release
+}
 
 package() {
-    curl -fSL --retry 3 --retry-delay 2 -o "${_binary}" "${_url}"
-    echo "${_sha256}  ${_binary}" | sha256sum -c -
+    # Voller srcdir-Pfad statt eines relativen "cd": package() laeuft in
+    # einer eigenen fakeroot-Subshell und darf sich nicht auf das cd aus
+    # build() verlassen (siehe homepage/vaultwarden/paperless-ngx PKGBUILD).
+    cd "${srcdir}/miniserve-${pkgver}"
 
-    install -Dm755 "${_binary}" "${pkgdir}/usr/bin/miniserve"
+    install -Dm755 "target/release/miniserve" "${pkgdir}/usr/bin/miniserve"
 
     install -Dm640 /dev/null "${pkgdir}/etc/miniserve.env"
     cat <<'EOF' > "${pkgdir}/etc/miniserve.env"
@@ -55,7 +87,9 @@ MINISERVE_PATH=/opt/paperless/media/documents
 MINISERVE_PORT=8080
 MINISERVE_INTERFACE=172.19.19.4
 
-MINISERVE_COLOR_SCHEME=ayu-dark
+# "astrapi" ist ein eigenes, in dieses Paket gepatchtes Theme (siehe
+# astrapi.scss) -- kein Upstream-Farbschema.
+MINISERVE_COLOR_SCHEME=astrapi
 MINISERVE_DIRS_FIRST=true
 MINISERVE_HIDE_VERSION_FOOTER=true
 MINISERVE_HIDE_THEME_SELECTOR=true

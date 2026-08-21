@@ -1,0 +1,64 @@
+$generate_default: true !default;
+
+@mixin theme {
+  --background: #101010;
+  --text_color: #f4f4f5;
+  --directory_link_color: #f4f4f5;
+  --directory_link_color_visited: rgba(244, 244, 245, 0.72);
+  --file_link_color: #f4f4f5;
+  --file_link_color_visited: rgba(244, 244, 245, 0.72);
+  --symlink_color: #f59e0b;
+  --table_background: #1a1a1a;
+  --table_text_color: #f4f4f5;
+  --table_header_background: #222222;
+  --table_header_text_color: #f4f4f5;
+  --table_header_active_color: #f4f4f5;
+  --active_row_color: #2a2a2a;
+  --odd_row_background: #1a1a1a;
+  --even_row_background: #101010;
+  --root_link_color: rgba(244, 244, 245, 0.72);
+  --download_button_background: #2563eb;
+  --download_button_background_hover: #3b82f6;
+  --download_button_link_color: #ffffff;
+  --download_button_link_color_hover: #ffffff;
+  --back_button_background: rgba(255, 255, 255, 0.05);
+  --back_button_background_hover: #2a2a2a;
+  --back_button_link_color: #f4f4f5;
+  --back_button_link_color_hover: #f4f4f5;
+  --date_text_color: rgba(244, 244, 245, 0.72);
+  --at_color: rgba(244, 244, 245, 0.72);
+  --switch_theme_background: #1a1a1a;
+  --switch_theme_link_color: #f4f4f5;
+  --switch_theme_active: #f4f4f5;
+  --switch_theme_border: rgba(255, 255, 255, 0.08);
+  --change_theme_link_color: rgba(244, 244, 245, 0.72);
+  --change_theme_link_color_hover: #f4f4f5;
+  --upload_text_color: #f4f4f5;
+  --upload_form_border_color: rgba(255, 255, 255, 0.11);
+  --upload_form_background: #1a1a1a;
+  --upload_button_background: #2563eb;
+  --upload_button_text_color: #ffffff;
+  --rm_button_background: #dc2626;
+  --rm_button_text_color: #ffffff;
+  --drag_background: rgba(16, 16, 16, 0.85);
+  --drag_border_color: #2563eb;
+  --drag_text_color: #f4f4f5;
+  --size_background_color: #222222;
+  --size_text_color: rgba(244, 244, 245, 0.72);
+  --error_color: #f87171;
+  --footer_color: rgba(244, 244, 245, 0.42);
+  --success_color: #16a34a;
+  --upload_modal_header_background: #1a1a1a;
+  --upload_modal_header_color: #f4f4f5;
+  --upload_modal_sub_header_background: #151515;
+  --upload_modal_file_item_background: #222222;
+  --upload_modal_file_item_color: #f4f4f5;
+  --upload_modal_file_upload_complete_background: #16a34a;
+  --progress_bar_background: #2563eb;
+};
+
+@if $generate_default {
+  body {
+    @include theme;
+  }
+}
