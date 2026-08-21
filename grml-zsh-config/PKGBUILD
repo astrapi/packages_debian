@@ -1,27 +1,30 @@
 # Maintainer: astrapi <astrapi@example.com>
 # Upstream:   Pierre Schmitz <pierre@archlinux.de>
 #
-# pkgrel 2: Bugfix, auf streaming.simpsons.lan aufgefallen -- dpkg lehnte
-# den Install ab ("trying to overwrite '/etc/zsh/zshrc', which is also
-# in package zsh-common"). /etc/zsh/zshrc ist dort ein echtes Conffile
-# von zsh-common, unser Paket installiert dieselbe Datei, ohne die
-# Übernahme zu deklarieren. Weder das echte Debian-Paket (grml-etc-core)
-# noch das Arch-Paket (grml-zsh-config, gleicher Upstream) brauchen das,
-# weil beide diese Konstellation anders loesen bzw. gar nicht erst
-# haben -- Debian Policy §7.6.2 sieht fuer genau diesen Fall vor:
-# "Replaces:" auf das abgebende Paket setzen (kein "Conflicts:", das
-# wuerde zsh-common komplett verdraengen wollen -- bleibt aber
-# installiert, nur diese eine Datei wechselt den Besitzer).
+# pkgrel 2: erster Versuch, "replaces=('zsh-common')" ergaenzt --
+# wirkungslos, die Build-Pipeline (jobs.py) uebersetzt dieses Feld fuer
+# Debian-Pakete nicht (nur Arch-Pakete in diesem Repo nutzen es bisher,
+# per "dpkg-deb -I" verifiziert: kein "Replaces:" im generierten
+# control). Deshalb entfernt, siehe pkgrel 3.
+#
+# pkgrel 3: eigentlicher Fix, auf streaming.simpsons.lan aufgefallen --
+# dpkg lehnte den Install ab ("trying to overwrite '/etc/zsh/zshrc',
+# which is also in package zsh-common"), dort ein echtes Conffile von
+# zsh-common. Da die Pipeline kein "Replaces:"-Feld setzt, stattdessen
+# der klassische Debian-Mechanismus komplett ueber Maintainer-Skripte:
+# "dpkg-divert" in preinst/postrm (siehe Kommentare dort) -- braucht
+# keine besondere Control-Datei-Unterstuetzung durch die Pipeline, nur
+# normale preinst/postrm-Skripte, die die Pipeline nachweislich
+# unveraendert uebernimmt (wie bei jedem anderen Paket hier).
 pkgname=grml-zsh-config
 pkgver=0.19.28
-pkgrel=2
+pkgrel=3
 pkgdesc="grml's zsh setup"
 arch=('all')
 distribution=trixie
 url='https://grml.org/zsh/'
 license=('GPL-2')
 depends=('zsh' 'coreutils' 'grep' 'sed' 'procps')
-replaces=('zsh-common')
 makedepends=('curl')
 source=()
 
@@ -57,4 +60,32 @@ License: GPL-2
  On Debian systems, the full text of the GNU General Public License
  version 2 can be found in /usr/share/common-licenses/GPL-2.
 EOF
+
+    # dpkg-divert statt "Replaces:" (siehe Kommentar am Dateianfang):
+    # lenkt /etc/zsh/zshrc VOR dem eigentlichen Unpack aus dem Weg, damit
+    # zsh-commons Anspruch auf den Pfad nicht mehr kollidiert -- unser
+    # eigenes Paket ist von der Umlenkung ausgenommen ("--package"),
+    # bekommt den echten Pfad also trotzdem.
+    install -d "${pkgdir}/DEBIAN"
+    cat > "${pkgdir}/DEBIAN/preinst" << 'EOF'
+#!/bin/sh
+set -e
+dpkg-divert --package grml-zsh-config --add --rename \
+    --divert /etc/zsh/zshrc.zsh-common /etc/zsh/zshrc
+EOF
+    chmod 755 "${pkgdir}/DEBIAN/preinst"
+
+    cat > "${pkgdir}/DEBIAN/postrm" << 'EOF'
+#!/bin/sh
+set -e
+# dpkg ruft postrm bei "purge" zweimal mit unterschiedlichem $1 auf
+# ("remove", dann spaeter "purge") -- die Umlenkung nur beim ersten Mal
+# aufheben, sonst meldet dpkg-divert beim zweiten Aufruf harmlos aber
+# unnoetig "none removed".
+if [ "$1" = "remove" ]; then
+    dpkg-divert --package grml-zsh-config --remove --rename \
+        --divert /etc/zsh/zshrc.zsh-common /etc/zsh/zshrc
+fi
+EOF
+    chmod 755 "${pkgdir}/DEBIAN/postrm"
 }
