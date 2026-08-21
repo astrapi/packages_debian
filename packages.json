@@ -52,8 +52,8 @@
   {
     "name": "miniserve",
     "pkgver": "0.35.0",
-    "pkgrel": "6",
-    "pkgdesc": "Minimalistischer, schreibgeschuetzter HTTP-Dateiserver (astrapi-Theme) -- hier als Werkzeug zum Durchstoebern der paperless-ngx-Dokumentenablage",
+    "pkgrel": "7",
+    "pkgdesc": "Minimalistischer, schreibgeschuetzter HTTP-Dateiserver mit eigenem astrapi-Theme",
     "arch": "amd64",
     "distribution": "trixie",
     "subdir": "miniserve",
