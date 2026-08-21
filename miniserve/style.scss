@@ -252,45 +252,51 @@ a.directory::before {
   content: "📁 ";
 }
 
-// Astrapi-Theme: schlanke einfarbige Linien-Icons statt bunter Emoji,
-// per mask-image in der jeweiligen Link-Farbe (currentColor) statt
-// fester Emoji-Farbe -- passt zum monochromen, akzentfarbigen
-// Design-System (siehe astrapi-hub/library/design-tokens.md).
-body[data-theme="astrapi"] {
-  // Titelzeile (Host/eigener Titel) + Suchfeld komplett weg statt nur
-  // den Text zu leeren -- sonst bleibt eine leere Zeile stehen. Paket
-  // ist absichtlich nicht auf einen festen Titeltext festgelegt, damit
-  // es sich fuer andere Verzeichnisse/Hosts wiederverwenden laesst.
-  .title-search-box {
-    display: none;
-  }
+// Astrapi-Anpassungen: NICHT an body[data-theme="astrapi"] gebunden --
+// dieses Attribut setzt miniserve ausschliesslich clientseitig per JS,
+// wenn im Theme-Umschalter manuell geklickt wird. Dieses Deployment
+// blendet den Umschalter aber bewusst aus (MINISERVE_HIDE_THEME_SELECTOR)
+// und faehrt IMMER mit dem astrapi-Theme -- ein an data-theme gebundenes
+// Overlay wuerde also nie greifen. Deshalb unconditional.
+//
+// Schlanke einfarbige Linien-Icons statt bunter Emoji, per mask-image in
+// der jeweiligen Link-Farbe (currentColor) statt fester Emoji-Farbe --
+// passt zum monochromen, akzentfarbigen Design-System (siehe
+// astrapi-hub/library/design-tokens.md).
+//
+// Titelzeile (Host/eigener Titel) + Suchfeld komplett weg statt nur den
+// Text zu leeren -- sonst bleibt eine leere Zeile stehen. Paket ist
+// absichtlich nicht auf einen festen Titeltext festgelegt, damit es
+// sich fuer andere Verzeichnisse/Hosts wiederverwenden laesst.
+.title-search-box {
+  display: none;
+}
 
-  a.file::before,
-  a.directory::before {
-    content: "";
-    display: inline-block;
-    width: 1.05em;
-    height: 1.05em;
-    margin-right: 0.4em;
-    vertical-align: -0.2em;
-    background-color: currentColor;
-    -webkit-mask-repeat: no-repeat;
-    mask-repeat: no-repeat;
-    -webkit-mask-size: contain;
-    mask-size: contain;
-    -webkit-mask-position: center;
-    mask-position: center;
-  }
+a.file::before,
+a.directory::before {
+  content: "";
+  display: inline-block;
+  width: 1.05em;
+  height: 1.05em;
+  margin-right: 0.4em;
+  vertical-align: -0.2em;
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
 
-  a.directory::before {
-    -webkit-mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="black"><path d="M2 6a2 2 0 0 1 2-2h4.379a2 2 0 0 1 1.414.586l1.121 1.121A2 2 0 0 0 12.328 6H16a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6Z"/></svg>');
-    mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="black"><path d="M2 6a2 2 0 0 1 2-2h4.379a2 2 0 0 1 1.414.586l1.121 1.121A2 2 0 0 0 12.328 6H16a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6Z"/></svg>');
-  }
+a.directory::before {
+  -webkit-mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="black"><path d="M2 6a2 2 0 0 1 2-2h4.379a2 2 0 0 1 1.414.586l1.121 1.121A2 2 0 0 0 12.328 6H16a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6Z"/></svg>');
+  mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="black"><path d="M2 6a2 2 0 0 1 2-2h4.379a2 2 0 0 1 1.414.586l1.121 1.121A2 2 0 0 0 12.328 6H16a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6Z"/></svg>');
+}
 
-  a.file::before {
-    -webkit-mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="black"><path fill-rule="evenodd" d="M4 2a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7.914a2 2 0 0 0-.586-1.414l-3.914-3.914A2 2 0 0 0 8.086 2H4Zm2 10a1 1 0 1 0 0 2h4a1 1 0 1 0 0-2H6Zm0-4a1 1 0 1 0 0 2h4a1 1 0 1 0 0-2H6Z" clip-rule="evenodd"/></svg>');
-    mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="black"><path fill-rule="evenodd" d="M4 2a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7.914a2 2 0 0 0-.586-1.414l-3.914-3.914A2 2 0 0 0 8.086 2H4Zm2 10a1 1 0 1 0 0 2h4a1 1 0 1 0 0-2H6Zm0-4a1 1 0 1 0 0 2h4a1 1 0 1 0 0-2H6Z" clip-rule="evenodd"/></svg>');
-  }
+a.file::before {
+  -webkit-mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="black"><path fill-rule="evenodd" d="M4 2a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7.914a2 2 0 0 0-.586-1.414l-3.914-3.914A2 2 0 0 0 8.086 2H4Zm2 10a1 1 0 1 0 0 2h4a1 1 0 1 0 0-2H6Zm0-4a1 1 0 1 0 0 2h4a1 1 0 1 0 0-2H6Z" clip-rule="evenodd"/></svg>');
+  mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="black"><path fill-rule="evenodd" d="M4 2a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7.914a2 2 0 0 0-.586-1.414l-3.914-3.914A2 2 0 0 0 8.086 2H4Zm2 10a1 1 0 1 0 0 2h4a1 1 0 1 0 0-2H6Zm0-4a1 1 0 1 0 0 2h4a1 1 0 1 0 0-2H6Z" clip-rule="evenodd"/></svg>');
 }
 
 a.directory:hover {

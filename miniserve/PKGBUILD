@@ -24,6 +24,18 @@
 # fuer andere Verzeichnisse/Hosts wiederverwenden lassen, daher blendet
 # astrapi.scss die ganze Titel-/Suchzeile aus statt sie zu befuellen.
 #
+# pkgrel 5: Bugfix, live auf dms.simpsons.lan aufgefallen -- die Icon-/
+# Titel-/Suchzeilen-Anpassungen in style.scss waren an
+# "body[data-theme=astrapi]" gebunden, dieses Attribut setzt miniserve
+# aber ausschliesslich clientseitig per JS beim manuellen Klick im
+# Theme-Umschalter. Der ist hier bewusst ausgeblendet
+# (MINISERVE_HIDE_THEME_SELECTOR) -- das Overlay griff also nie, jetzt
+# unconditional in style.scss. Zusaetzlich MINISERVE_COLOR_SCHEME_DARK
+# ergaenzt (vorher nur COLOR_SCHEME gesetzt): ohne das gewinnt bei
+# "prefers-color-scheme: dark" der Upstream-Default "archlinux" ueber
+# unser astrapi, weil dessen @media-Block textuell nach unserem im
+# generierten Stylesheet steht.
+#
 # Braucht ein dediziertes Docker-Image (ctl/debian-builder-rust statt
 # ctl/debian-builder, gleicher Grund wie bei vaultwarden/PKGBUILD):
 # der Standard-Image hat kein cargo/rustc. miniserve selbst braucht
@@ -49,7 +61,7 @@
 # die hinter Caddy laufen. depends=('caddy') ergaenzt.
 pkgname=miniserve
 pkgver=0.35.0
-pkgrel=4
+pkgrel=5
 pkgdesc="Minimalistischer, schreibgeschuetzter HTTP-Dateiserver (astrapi-Theme) -- hier als Werkzeug zum Durchstoebern der paperless-ngx-Dokumentenablage"
 arch=('amd64')
 distribution=trixie
@@ -98,8 +110,14 @@ MINISERVE_PORT=8080
 MINISERVE_INTERFACE=127.0.0.1
 
 # "astrapi" ist ein eigenes, in dieses Paket gepatchtes Theme (siehe
-# astrapi.scss) -- kein Upstream-Farbschema.
+# astrapi.scss) -- kein Upstream-Farbschema. COLOR_SCHEME_DARK
+# zusaetzlich zu COLOR_SCHEME setzen: sonst greift bei
+# "prefers-color-scheme: dark" (bei den meisten Browsern/Systemen
+# Standard) der eigene Upstream-Default "archlinux" statt astrapi --
+# beide Blöcke landen im selben Stylesheet, der Dark-Media-Query-Block
+# steht dort textuell nach unserem und gewinnt sonst die Kaskade.
 MINISERVE_COLOR_SCHEME=astrapi
+MINISERVE_COLOR_SCHEME_DARK=astrapi
 MINISERVE_DIRS_FIRST=true
 MINISERVE_HIDE_VERSION_FOOTER=true
 MINISERVE_HIDE_THEME_SELECTOR=true
