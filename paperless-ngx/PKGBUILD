@@ -1,5 +1,18 @@
 # Maintainer: Michael Otto <michael@astrapi.de>
 #
+# pkgrel 3: Bugfix, live auf dms.simpsons.lan nach einem Server-Neustart
+# aufgefallen -- paperless-webserver.service scheiterte mit "Address
+# already in use" auf Port 8000. Ursache: die mitgelieferte
+# paperless-webserver.socket-Unit wurde nie tatsaechlich per Socket-
+# Activation genutzt (granian bindet den Port selbst ueber
+# GRANIAN_PORT, das "#Requires=paperless-webserver.socket" im Service
+# war schon vorher auskommentiert). Solange die .socket-Unit inaktiv
+# blieb, fiel das nie auf -- nach dem Reboot war sie aber aktiviert
+# (Debian-Preset) und belegte Port 8000 zuerst, bevor der eigentliche
+# Dienst binden konnte. Fix: .socket-Unit komplett aus dem Paket
+# entfernt, postinst stoppt/deaktiviert eine evtl. noch aktive Unit aus
+# einer frueheren Paketversion.
+#
 # pkgrel 2: liefert jetzt eine fertige Caddy-Site-Datei
 # (/etc/caddy/sites-enabled/paperless-ngx.caddy) statt den Reverse-Proxy
 # ausschliesslich Hand-editiert in der Haupt-Caddyfile zu pflegen --
@@ -80,7 +93,7 @@
 # (gleicher Mechanismus wie bookstacks .env, siehe E-007).
 pkgname=paperless-ngx
 pkgver=3.0.5
-pkgrel=2
+pkgrel=3
 pkgdesc="A community-supported supercharged document management system: scan, index and archive all your physical documents"
 arch=('amd64')
 distribution=trixie
@@ -260,7 +273,6 @@ Description=Paperless webserver
 After=network.target
 Wants=network.target
 Requires=redis-server.service
-#Requires=paperless-webserver.socket
 
 [Service]
 User=paperless
@@ -284,20 +296,6 @@ Restart=on-failure
 WantedBy=multi-user.target
 EOF
     chmod 644 "${pkgdir}/usr/lib/systemd/system/paperless-webserver.service"
-
-    install -Dm644 /dev/null "${pkgdir}/usr/lib/systemd/system/paperless-webserver.socket"
-    cat <<'EOF' > "${pkgdir}/usr/lib/systemd/system/paperless-webserver.socket"
-[Unit]
-Description=Paperless Webserver Socket
-
-[Socket]
-ListenStream=8000
-NoDelay=true
-
-[Install]
-WantedBy=sockets.target
-EOF
-    chmod 644 "${pkgdir}/usr/lib/systemd/system/paperless-webserver.socket"
 
     install -Dm644 /dev/null "${pkgdir}/usr/lib/systemd/system/paperless-consumer.service"
     cat <<'EOF' > "${pkgdir}/usr/lib/systemd/system/paperless-consumer.service"
@@ -408,6 +406,21 @@ if grep -q '^PAPERLESS_SECRET_KEY=change-me$' /opt/paperless/paperless.conf; the
     _key=$(head -c 48 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 64)
     sed -i "s/^PAPERLESS_SECRET_KEY=change-me\$/PAPERLESS_SECRET_KEY=${_key}/" /opt/paperless/paperless.conf
 fi
+
+# paperless-webserver.socket wurde in einer frueheren Paketversion
+# mitgeliefert, aber vom Service nie tatsaechlich per Socket-Activation
+# genutzt (granian bindet den Port selbst, ueber GRANIAN_PORT). Sobald
+# die .socket-Unit aktiv war (z.B. durch einen Reboot, oder weil ein
+# Debian-Preset sie beim Erstinstall automatisch aktiviert hat), belegt
+# sie Port 8000 zuerst und paperless-webserver.service scheitert beim
+# eigenen Bind-Versuch mit "Address already in use" -- live auf
+# dms.simpsons.lan nach einem Neustart aufgetreten. Die Unit-Datei
+# selbst entfernt dpkg beim Upgrade automatisch (nicht mehr Teil dieses
+# Pakets), aber Stop/Disable des noch laufenden/aktivierten Zustands
+# muss explizit passieren.
+systemctl stop paperless-webserver.socket 2>/dev/null || true
+systemctl disable paperless-webserver.socket 2>/dev/null || true
+systemctl reset-failed paperless-webserver paperless-webserver.socket 2>/dev/null || true
 
 # systemd merkt jeden dpkg-Schreibvorgang auf die Unit-Dateien als
 # "changed on disk" (auch bei inhaltlich identischem Neuschreiben) und
