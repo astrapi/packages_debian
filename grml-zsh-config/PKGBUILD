@@ -1,15 +1,27 @@
 # Maintainer: astrapi <astrapi@example.com>
 # Upstream:   Pierre Schmitz <pierre@archlinux.de>
-
+#
+# pkgrel 2: Bugfix, auf streaming.simpsons.lan aufgefallen -- dpkg lehnte
+# den Install ab ("trying to overwrite '/etc/zsh/zshrc', which is also
+# in package zsh-common"). /etc/zsh/zshrc ist dort ein echtes Conffile
+# von zsh-common, unser Paket installiert dieselbe Datei, ohne die
+# Übernahme zu deklarieren. Weder das echte Debian-Paket (grml-etc-core)
+# noch das Arch-Paket (grml-zsh-config, gleicher Upstream) brauchen das,
+# weil beide diese Konstellation anders loesen bzw. gar nicht erst
+# haben -- Debian Policy §7.6.2 sieht fuer genau diesen Fall vor:
+# "Replaces:" auf das abgebende Paket setzen (kein "Conflicts:", das
+# wuerde zsh-common komplett verdraengen wollen -- bleibt aber
+# installiert, nur diese eine Datei wechselt den Besitzer).
 pkgname=grml-zsh-config
 pkgver=0.19.28
-pkgrel=1
+pkgrel=2
 pkgdesc="grml's zsh setup"
 arch=('all')
 distribution=trixie
 url='https://grml.org/zsh/'
 license=('GPL-2')
 depends=('zsh' 'coreutils' 'grep' 'sed' 'procps')
+replaces=('zsh-common')
 makedepends=('curl')
 source=()
 
