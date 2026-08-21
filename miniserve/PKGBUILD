@@ -37,12 +37,15 @@
 # paperless-ngx/PKGBUILD postinst). depends=('paperless-ngx') stellt
 # sicher, dass es diesen User und das Zielverzeichnis ueberhaupt gibt.
 #
-# Port/Adresse (8080 / 172.19.19.4) uebernehmen 1:1 die bisherige
-# manuelle filebrowser-Installation auf dms.simpsons.lan (T-012-DEBIAN)
-# -- reiner Werkzeugtausch, gleiche Betriebsparameter.
+# Port 8080 uebernimmt die bisherige manuelle filebrowser-Installation
+# auf dms.simpsons.lan (T-012-DEBIAN). Ab pkgrel 3 aber nur noch auf
+# 127.0.0.1 gebunden statt auf die oeffentliche Adresse 172.19.19.4 --
+# Caddy uebernimmt TLS + externen Zugriff auf Port 8443 per
+# reverse_proxy, gleiches Muster wie paperless-ngx auf Port 8000
+# (siehe /etc/caddy/Caddyfile auf dms.simpsons.lan).
 pkgname=miniserve
 pkgver=0.35.0
-pkgrel=2
+pkgrel=3
 pkgdesc="Minimalistischer, schreibgeschuetzter HTTP-Dateiserver (astrapi-Theme) -- hier als Werkzeug zum Durchstoebern der paperless-ngx-Dokumentenablage"
 arch=('amd64')
 distribution=trixie
@@ -85,7 +88,10 @@ package() {
 
 MINISERVE_PATH=/opt/paperless/media/documents
 MINISERVE_PORT=8080
-MINISERVE_INTERFACE=172.19.19.4
+# Nur lokal: Caddy uebernimmt TLS + oeffentlichen Zugriff (Port 8443,
+# siehe /etc/caddy/Caddyfile auf dms.simpsons.lan) per reverse_proxy
+# auf diesen Port -- gleiches Muster wie paperless-ngx auf Port 8000.
+MINISERVE_INTERFACE=127.0.0.1
 
 # "astrapi" ist ein eigenes, in dieses Paket gepatchtes Theme (siehe
 # astrapi.scss) -- kein Upstream-Farbschema.
@@ -137,6 +143,10 @@ miniserve installiert, aber noch nicht aktiv:
      optional Basic-Auth via MINISERVE_AUTH).
   3. Dienst aktivieren:
      systemctl enable --now miniserve
+  4. Fuer oeffentlichen Zugriff: eigenen Site-Block in
+     /etc/caddy/Caddyfile ergaenzen (reverse_proxy 127.0.0.1:8080 auf
+     einem eigenen Port, z.B. :8443), danach:
+     systemctl reload caddy
 MSG
 EOF
     chmod 755 "${pkgdir}/DEBIAN/postinst"
