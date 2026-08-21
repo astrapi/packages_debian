@@ -53,12 +53,6 @@
 # das groessere Rust-Image passt trotzdem, weil es schon im Repo
 # gecacht ist.
 #
-# Laeuft als User "paperless" statt eines eigenen dedizierten
-# System-Users: braucht Lesezugriff auf /opt/paperless/media/documents,
-# das ausschliesslich paperless:paperless gehoert (siehe
-# paperless-ngx/PKGBUILD postinst). depends=('paperless-ngx') stellt
-# sicher, dass es diesen User und das Zielverzeichnis ueberhaupt gibt.
-#
 # Port 8080 uebernimmt die bisherige manuelle filebrowser-Installation
 # auf dms.simpsons.lan (T-012-DEBIAN). Ab pkgrel 3 aber nur noch auf
 # 127.0.0.1 gebunden statt auf die oeffentliche Adresse 172.19.19.4 --
@@ -69,15 +63,32 @@
 # gleiches Muster wie bookstack (E-008), auf Nutzerwunsch ("der
 # bookstack-Weg ist der bessere") ab jetzt Konvention fuer alle Pakete,
 # die hinter Caddy laufen. depends=('caddy') ergaenzt.
+#
+# pkgrel 7: von "nur fuer paperless-ngx auf dms.simpsons.lan" auf
+# allgemein wiederverwendbar umgebaut -- Nutzerwunsch, das Paket auch
+# fuer andere Verzeichnisse/Server einsetzen zu koennen. Vorher lief es
+# als User "paperless" (brauchte depends=('paperless-ngx') nur um an
+# diesen User + /opt/paperless/media/documents zu kommen -- auf einem
+# anderen Host haette das ungefragt das ganze, fachfremde paperless-ngx-
+# Paket mitinstalliert). Jetzt: eigener dedizierter System-User
+# "miniserve" (gleiches Muster wie vaultwarden), depends=('paperless-ngx')
+# entfernt. Fuer den konkreten dms.simpsons.lan-Einsatz (Lesezugriff auf
+# /opt/paperless/media/documents, gehoert paperless:paperless) tritt
+# "miniserve" der Gruppe "paperless" bei -- nur falls diese Gruppe
+# existiert (gleiches bedingtes usermod-Muster wie bei Caddys eigenem
+# postinst fuer die www-data-Gruppe, siehe bookstack/E-008). Die
+# MINISERVE_PATH/-Werte in der Config bleiben als Beispiel/Default fuer
+# genau diesen Host stehen -- Conffile, pro Deployment frei anpassbar,
+# gleiches Prinzip wie paperless.conf/bookstacks .env.
 pkgname=miniserve
 pkgver=0.35.0
-pkgrel=6
-pkgdesc="Minimalistischer, schreibgeschuetzter HTTP-Dateiserver (astrapi-Theme) -- hier als Werkzeug zum Durchstoebern der paperless-ngx-Dokumentenablage"
+pkgrel=7
+pkgdesc="Minimalistischer, schreibgeschuetzter HTTP-Dateiserver mit eigenem astrapi-Theme"
 arch=('amd64')
 distribution=trixie
 url="https://github.com/svenstaro/miniserve"
 license=('MIT')
-depends=('paperless-ngx' 'caddy')
+depends=('caddy')
 makedepends=('cargo' 'rustc') # Dokumentarisch -- kommen fest aus ctl/debian-builder-rust
 source=('astrapi.scss' 'style.scss' 'renderer.rs')
 
@@ -112,6 +123,9 @@ package() {
 # Alle Flags aus "miniserve --help" sind hier als MINISERVE_<FLAG> setzbar
 # (siehe [env: ...]-Angabe je Flag in der Hilfe).
 
+# MINISERVE_PATH ist ein Beispiel/Default fuer den konkreten
+# dms.simpsons.lan-Einsatz (paperless-ngx-Dokumentenablage) -- fuer
+# andere Deployments einfach auf das gewuenschte Verzeichnis anpassen.
 MINISERVE_PATH=/opt/paperless/media/documents
 MINISERVE_PORT=8080
 # Nur lokal: Caddy uebernimmt TLS + oeffentlichen Zugriff (Port 8443,
@@ -152,13 +166,13 @@ EOF
     install -Dm644 /dev/null "${pkgdir}/usr/lib/systemd/system/miniserve.service"
     cat <<'EOF' > "${pkgdir}/usr/lib/systemd/system/miniserve.service"
 [Unit]
-Description=miniserve (Dokumentenablage von paperless-ngx durchstoebern)
+Description=miniserve (schreibgeschuetzter Datei-Browser)
 Documentation=https://github.com/svenstaro/miniserve
-After=network.target paperless-webserver.service
+After=network.target
 
 [Service]
-User=paperless
-Group=paperless
+User=miniserve
+Group=miniserve
 EnvironmentFile=/etc/miniserve.env
 ExecStart=/usr/bin/miniserve
 Restart=on-failure
@@ -178,6 +192,20 @@ EOF
     cat > "${pkgdir}/DEBIAN/postinst" << 'EOF'
 #!/bin/sh
 set -e
+if ! getent passwd miniserve >/dev/null; then
+    adduser --system --group --no-create-home --home /var/lib/miniserve \
+        --shell /usr/sbin/nologin miniserve
+fi
+
+# Nur fuer den konkreten dms.simpsons.lan-Einsatz relevant (Lesezugriff
+# auf /opt/paperless/media/documents, gehoert paperless:paperless) --
+# no-op auf jedem anderen Host, auf dem es diese Gruppe nicht gibt.
+# Gleiches bedingtes Muster wie Caddys eigenes postinst fuer die
+# www-data-Gruppe (siehe bookstack/E-008).
+if getent group paperless >/dev/null; then
+    usermod -aG paperless miniserve
+fi
+
 systemctl daemon-reload 2>/dev/null || true
 systemctl reload caddy 2>/dev/null || true
 
@@ -186,16 +214,19 @@ miniserve installiert, aber noch nicht aktiv:
   1. Falls auf diesem Host bereits ein manuell gestarteter filebrowser-
      oder miniserve-Prozess auf Port 8080 laeuft: diesen zuerst beenden,
      sonst kollidiert das Paket beim Start mit "Address already in use".
-  2. Konfiguration in /etc/miniserve.env pruefen (Pfad/Port/Interface,
-     optional Basic-Auth via MINISERVE_AUTH).
+  2. Konfiguration in /etc/miniserve.env pruefen (mindestens PATH auf
+     das gewuenschte Verzeichnis anpassen, dazu Port/Interface,
+     optional Basic-Auth via MINISERVE_AUTH). Der User "miniserve"
+     braucht Lesezugriff auf das konfigurierte MINISERVE_PATH.
   3. Dienst aktivieren:
      systemctl enable --now miniserve
   4. Caddy-Site-Datei /etc/caddy/sites-enabled/miniserve.caddy ist
-     angelegt, aber noch NICHT automatisch aktiv -- in der Haupt-
+     angelegt, aber noch NICHT automatisch aktiv -- Domain/Port im
+     Snippet auf diesen Host anpassen (Default ist auf
+     dms.simpsons.lan:8443 vorbelegt), dann in der Haupt-
      /etc/caddy/Caddyfile einmalig ergaenzen (falls noch nicht
      vorhanden):
        import /etc/caddy/sites-enabled/*.caddy
-     Domain/Port/TLS-Zertifikatpfade im Snippet bei Bedarf anpassen,
      danach systemctl reload caddy
 MSG
 EOF
@@ -205,6 +236,9 @@ EOF
 #!/bin/sh
 set -e
 systemctl daemon-reload 2>/dev/null || true
+if [ "$1" = "purge" ]; then
+    deluser --system miniserve >/dev/null 2>&1 || true
+fi
 EOF
     chmod 755 "${pkgdir}/DEBIAN/postrm"
 }
