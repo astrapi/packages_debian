@@ -22,7 +22,7 @@
   {
     "name": "grml-zsh-config",
     "pkgver": "0.19.28",
-    "pkgrel": "1",
+    "pkgrel": "2",
     "pkgdesc": "grml's zsh setup",
     "arch": "all",
     "distribution": "trixie",
