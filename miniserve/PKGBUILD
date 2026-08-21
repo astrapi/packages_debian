@@ -1,0 +1,113 @@
+# Maintainer: Michael Otto <michael@astrapi.de>
+#
+# Ersatz fuer filebrowser (T-012-DEBIAN): filebrowser wird am 2026-09-01
+# archiviert (letzte Version v2.63.23, danach keine Releases/Security-
+# Fixes mehr -- beim Funktionstest der filebrowser-Variante dieses
+# Pakets live im Programmoutput aufgefallen). miniserve ist aktiv
+# gepflegt, deutlich kleiner (nur Durchstoebern, kein Multi-User/DB-
+# Unterbau) und deckt den eigentlichen Bedarf (Dateistruktur der
+# paperless-ngx-Dokumente ansehen) genauso ab -- standardmaessig
+# schreibgeschuetzt (Upload/Loeschen nur mit explizitem
+# "--upload-files"-Flag, hier bewusst nicht gesetzt).
+#
+# musl- statt gnu-Build: vollstatisch (keine libc-Versionsabhaengigkeit
+# zum Zielsystem), gleiches Prinzip wie filebrowser/vaultwarden-web-
+# vault -- kein Build noetig, nur Download + Checksum.
+#
+# Laeuft als User "paperless" statt eines eigenen dedizierten
+# System-Users: braucht Lesezugriff auf /opt/paperless/media/documents,
+# das ausschliesslich paperless:paperless gehoert (siehe
+# paperless-ngx/PKGBUILD postinst). depends=('paperless-ngx') stellt
+# sicher, dass es diesen User und das Zielverzeichnis ueberhaupt gibt.
+#
+# Port/Adresse (8080 / 172.19.19.4) uebernehmen 1:1 die bisherige
+# manuelle filebrowser-Installation auf dms.simpsons.lan (T-012-DEBIAN)
+# -- reiner Werkzeugtausch, gleiche Betriebsparameter.
+pkgname=miniserve
+pkgver=0.35.0
+pkgrel=1
+pkgdesc="Minimalistischer, schreibgeschuetzter HTTP-Dateiserver -- hier als Werkzeug zum Durchstoebern der paperless-ngx-Dokumentenablage"
+arch=('amd64')
+distribution=trixie
+url="https://github.com/svenstaro/miniserve"
+license=('MIT')
+depends=('paperless-ngx')
+makedepends=('curl')
+source=()
+
+_sha256="c630ee030d5d9d83c88c5cc72f43ae215b0c214d64fd7afc92244fe369af2964"
+_binary="miniserve-${pkgver}-x86_64-unknown-linux-musl"
+_url="https://github.com/svenstaro/miniserve/releases/download/v${pkgver}/${_binary}"
+
+package() {
+    curl -fSL --retry 3 --retry-delay 2 -o "${_binary}" "${_url}"
+    echo "${_sha256}  ${_binary}" | sha256sum -c -
+
+    install -Dm755 "${_binary}" "${pkgdir}/usr/bin/miniserve"
+
+    install -Dm640 /dev/null "${pkgdir}/etc/miniserve.env"
+    cat <<'EOF' > "${pkgdir}/etc/miniserve.env"
+# miniserve Konfiguration fuer Debian
+# Alle Flags aus "miniserve --help" sind hier als MINISERVE_<FLAG> setzbar
+# (siehe [env: ...]-Angabe je Flag in der Hilfe).
+
+MINISERVE_PATH=/opt/paperless/media/documents
+MINISERVE_PORT=8080
+MINISERVE_INTERFACE=172.19.19.4
+
+# Optional: Basic-Auth aktivieren (Format user:password oder
+# user:sha256:<hash>/user:sha512:<hash>), standardmaessig aus:
+# MINISERVE_AUTH=user:password
+EOF
+
+    install -Dm644 /dev/null "${pkgdir}/usr/lib/systemd/system/miniserve.service"
+    cat <<'EOF' > "${pkgdir}/usr/lib/systemd/system/miniserve.service"
+[Unit]
+Description=miniserve (Dokumentenablage von paperless-ngx durchstoebern)
+Documentation=https://github.com/svenstaro/miniserve
+After=network.target paperless-webserver.service
+
+[Service]
+User=paperless
+Group=paperless
+EnvironmentFile=/etc/miniserve.env
+ExecStart=/usr/bin/miniserve
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # /etc/miniserve.env als Conffile: laesst dpkg eine vom Nutzer
+    # angepasste Config (z.B. MINISERVE_AUTH) bei einem Upgrade
+    # unangetastet -- gleiche Konvention wie paperless.conf.
+    install -d "${pkgdir}/DEBIAN"
+    echo "/etc/miniserve.env" > "${pkgdir}/DEBIAN/conffiles"
+
+    cat > "${pkgdir}/DEBIAN/postinst" << 'EOF'
+#!/bin/sh
+set -e
+systemctl daemon-reload 2>/dev/null || true
+
+cat <<'MSG'
+miniserve installiert, aber noch nicht aktiv:
+  1. Falls auf diesem Host bereits ein manuell gestarteter filebrowser-
+     oder miniserve-Prozess auf Port 8080 laeuft: diesen zuerst beenden,
+     sonst kollidiert das Paket beim Start mit "Address already in use".
+  2. Konfiguration in /etc/miniserve.env pruefen (Pfad/Port/Interface,
+     optional Basic-Auth via MINISERVE_AUTH).
+  3. Dienst aktivieren:
+     systemctl enable --now miniserve
+MSG
+EOF
+    chmod 755 "${pkgdir}/DEBIAN/postinst"
+
+    cat > "${pkgdir}/DEBIAN/postrm" << 'EOF'
+#!/bin/sh
+set -e
+systemctl daemon-reload 2>/dev/null || true
+EOF
+    chmod 755 "${pkgdir}/DEBIAN/postrm"
+}
+
+# vim:set ts=2 sw=2 et:
