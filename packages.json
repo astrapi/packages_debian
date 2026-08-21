@@ -50,6 +50,16 @@
     "git_url": "https://github.com/astrapi/packages_debian.git"
   },
   {
+    "name": "miniserve",
+    "pkgver": "0.35.0",
+    "pkgrel": "1",
+    "pkgdesc": "Minimalistischer, schreibgeschuetzter HTTP-Dateiserver -- hier als Werkzeug zum Durchstoebern der paperless-ngx-Dokumentenablage",
+    "arch": "amd64",
+    "distribution": "trixie",
+    "subdir": "miniserve",
+    "git_url": "https://github.com/astrapi/packages_debian.git"
+  },
+  {
     "name": "paperless-ngx",
     "pkgver": "3.0.5",
     "pkgrel": "1",
