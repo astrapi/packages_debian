@@ -1,0 +1,54 @@
+# Upstream-Versions-Check fuer PKGBUILDs ohne eigenen Update-Mechanismus.
+#
+# Nicht enthalten und bewusst nicht noetig: claude-temp-access, helloworld,
+# simpsons-keyring -- interne Pakete ohne echtes Upstream.
+#
+# nvchecker meldet nur "es gibt Version X" -- das Anpassen der PKGBUILD
+# selbst (pkgver ersetzen, pkgrel zuruecksetzen) macht ein separates Skript.
+# Alle sieben Pakete laden bereits mit "${pkgver}" (statt hartkodiertem
+# String) von GitHub, ein reiner pkgver-Ersatz reicht deshalb ueberall aus.
+#
+# use_max_tag: Paket wird direkt aus einem Git-Tag-Archiv gebaut
+# (archive/refs/tags/...), kein eigentliches GitHub-"Release".
+# use_max_release: Paket laedt ein Release-Asset (releases/download/...).
+
+[bookstack]
+source = "github"
+github = "BookStackApp/BookStack"
+use_max_tag = true
+prefix = "v"
+
+[grml-zsh-config]
+source = "github"
+github = "grml/grml-etc-core"
+use_max_tag = true
+prefix = "v"
+
+[homepage]
+source = "github"
+github = "gethomepage/homepage"
+use_max_tag = true
+prefix = "v"
+
+[miniserve]
+source = "github"
+github = "svenstaro/miniserve"
+use_max_tag = true
+prefix = "v"
+
+[vaultwarden]
+source = "github"
+github = "dani-garcia/vaultwarden"
+use_max_tag = true
+
+[paperless-ngx]
+source = "github"
+github = "paperless-ngx/paperless-ngx"
+use_max_release = true
+prefix = "v"
+
+[vaultwarden-web-vault]
+source = "github"
+github = "dani-garcia/bw_web_builds"
+use_max_release = true
+prefix = "v"
