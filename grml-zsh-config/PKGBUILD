@@ -17,8 +17,8 @@
 # normale preinst/postrm-Skripte, die die Pipeline nachweislich
 # unveraendert uebernimmt (wie bei jedem anderen Paket hier).
 pkgname=grml-zsh-config
-pkgver=0.19.28
-pkgrel=3
+pkgver=0.20.1
+pkgrel=1
 pkgdesc="grml's zsh setup"
 arch=('all')
 distribution=trixie

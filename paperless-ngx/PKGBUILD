@@ -92,8 +92,8 @@
 # automatisch bewahrt, kein manuelles Copy-Paste von Secrets noetig
 # (gleicher Mechanismus wie bookstacks .env, siehe E-007).
 pkgname=paperless-ngx
-pkgver=3.0.5
-pkgrel=3
+pkgver=3.1.0
+pkgrel=1
 pkgdesc="A community-supported supercharged document management system: scan, index and archive all your physical documents"
 arch=('amd64')
 distribution=trixie

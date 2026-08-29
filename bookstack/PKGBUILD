@@ -41,8 +41,8 @@
 # Conffile, aus demselben Grund (lokale Anpassungen sollen bei Upgrades
 # nicht klaglos ueberschrieben werden).
 pkgname=bookstack
-pkgver=26.05.3
-pkgrel=3
+pkgver=26.05.4
+pkgrel=1
 pkgdesc="BookStack is a simple, self-hosted, easy-to-use platform for organising and storing information (wiki)"
 arch=('amd64')
 distribution=trixie

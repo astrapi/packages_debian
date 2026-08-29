@@ -20,7 +20,7 @@
 # 1.37.0 (PR dani-garcia/vaultwarden#7434, das fehlerhafte Feld existiert
 # danach nicht mehr). MSRV bleibt bei genau 1.95.0, Image passt weiterhin.
 pkgname=vaultwarden
-pkgver=1.37.1
+pkgver=1.37.2
 pkgrel=1
 pkgdesc="An alternative Bitwarden server API implementation written in Rust"
 # Nur amd64: siehe homepage/PKGBUILD -- build_index.py kann ohnehin nur

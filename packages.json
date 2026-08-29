@@ -1,8 +1,8 @@
 [
   {
     "name": "bookstack",
-    "pkgver": "26.05.3",
-    "pkgrel": "3",
+    "pkgver": "26.05.4",
+    "pkgrel": "1",
     "pkgdesc": "BookStack is a simple, self-hosted, easy-to-use platform for organising and storing information (wiki)",
     "arch": "amd64",
     "distribution": "trixie",
@@ -21,8 +21,8 @@
   },
   {
     "name": "grml-zsh-config",
-    "pkgver": "0.19.28",
-    "pkgrel": "3",
+    "pkgver": "0.20.1",
+    "pkgrel": "1",
     "pkgdesc": "grml's zsh setup",
     "arch": "all",
     "distribution": "trixie",
@@ -61,8 +61,8 @@
   },
   {
     "name": "paperless-ngx",
-    "pkgver": "3.0.5",
-    "pkgrel": "3",
+    "pkgver": "3.1.0",
+    "pkgrel": "1",
     "pkgdesc": "A community-supported supercharged document management system: scan, index and archive all your physical documents",
     "arch": "amd64",
     "distribution": "trixie",
@@ -81,7 +81,7 @@
   },
   {
     "name": "vaultwarden",
-    "pkgver": "1.37.1",
+    "pkgver": "1.37.2",
     "pkgrel": "1",
     "pkgdesc": "An alternative Bitwarden server API implementation written in Rust",
     "arch": "amd64",
@@ -91,8 +91,8 @@
   },
   {
     "name": "vaultwarden-web-vault",
-    "pkgver": "2026.4.1",
-    "pkgrel": "2",
+    "pkgver": "2026.7.0",
+    "pkgrel": "1",
     "pkgdesc": "Web vault frontend for vaultwarden server",
     "arch": "all",
     "distribution": "trixie",
