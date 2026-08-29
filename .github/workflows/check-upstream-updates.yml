@@ -1,0 +1,45 @@
+name: Check upstream updates
+
+on:
+  schedule:
+    - cron: '17 5 * * *' # taeglich, off-peak Minute
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  check-upstream-updates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: nvchecker installieren
+        run: pip install nvchecker
+
+      - name: Auf neue Upstream-Versionen pruefen
+        id: check
+        run: ./check_upstream_updates.sh
+
+      - name: Commit und Push bei Aenderungen
+        run: |
+          if git diff --quiet; then
+            echo "Keine Aenderungen."
+            exit 0
+          fi
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add -- '*/PKGBUILD' packages.json
+          git commit -m "chore: Upstream-Updates $(date -u +%Y-%m-%d) [skip ci]" \
+                      -m "${{ steps.check.outputs.changed }}"
+          git push
+
+      - name: Fehlgeschlagene Checks melden
+        if: steps.check.outputs.failures != '0'
+        run: |
+          echo "::error::${{ steps.check.outputs.failures }} Upstream-Check(s) fehlgeschlagen."
+          exit 1
