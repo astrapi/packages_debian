@@ -3,17 +3,6 @@
 # Nicht enthalten und bewusst nicht noetig: claude-temp-access, helloworld,
 # simpsons-keyring -- interne Pakete ohne echtes Upstream.
 #
-# homepage bewusst herausgenommen (2026-08-29): 1.13.2 -> 2.1.2 ist ein
-# Major-Sprung, manuell zurueckgestellt bis geprueft (siehe T-022-DEBIAN
-# im packages-Vault) -- sonst wuerde der naechste taegliche Lauf die
-# Entscheidung stillschweigend ueberschreiben. Nach Abschluss von
-# T-022-DEBIAN hier wieder eintragen:
-#   [homepage]
-#   source = "github"
-#   github = "gethomepage/homepage"
-#   use_max_tag = true
-#   prefix = "v"
-#
 # nvchecker meldet nur "es gibt Version X" -- das Anpassen der PKGBUILD
 # selbst (pkgver ersetzen, pkgrel zuruecksetzen) macht ein separates Skript.
 # Alle sieben Pakete laden bereits mit "${pkgver}" (statt hartkodiertem
@@ -32,6 +21,12 @@ prefix = "v"
 [grml-zsh-config]
 source = "github"
 github = "grml/grml-etc-core"
+use_max_tag = true
+prefix = "v"
+
+[homepage]
+source = "github"
+github = "gethomepage/homepage"
 use_max_tag = true
 prefix = "v"
 
