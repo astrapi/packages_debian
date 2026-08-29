@@ -28,7 +28,7 @@ depends=('zsh' 'coreutils' 'grep' 'sed' 'procps')
 makedepends=('curl')
 source=()
 
-_sha256="79a1cba5a7232ff14b03a3ce9aeb8d42e060a0c3f6387ca799574b37b6fc400c"
+_sha256="85a0339e8a3e110a73d580890dcdcc91ad70c161a4e29c2b04a25f53d6e6d52b"
 _tarball="grml-etc-core-${pkgver}.tar.gz"
 _url="https://github.com/grml/grml-etc-core/archive/refs/tags/v${pkgver}.tar.gz"
 

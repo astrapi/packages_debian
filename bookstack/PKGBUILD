@@ -65,7 +65,7 @@ depends=(
 makedepends=('php8.4-cli' 'composer' 'git')
 source=()
 
-_sha256="0cceef9fa56ea68b5717b1afee890472dd949ddedbe7c285305a65dc2fb06079"
+_sha256="7ebe212958919f83c80b9c916541d9090896b8a9e990c4a7cde6a9af767cac29"
 _tarball="bookstack-v${pkgver}.tar.gz"
 _url="https://github.com/BookStackApp/BookStack/archive/refs/tags/v${pkgver}.tar.gz"
 

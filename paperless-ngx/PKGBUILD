@@ -132,7 +132,7 @@ depends=(
 makedepends=('python3-venv' 'python3-dev' 'libpq-dev' 'pkg-config')
 source=()
 
-_sha256="d45500dfb4624e72913ecb12fe7d71c2d4d17abeb2406b65054bff728eda5bd1"
+_sha256="30a733f1bb57c047254c50c22abf815c43f588321b0ac59995cfe09ed4c99fbe"
 _tarball="paperless-ngx-v${pkgver}.tar.xz"
 _url="https://github.com/paperless-ngx/paperless-ngx/releases/download/v${pkgver}/${_tarball}"
 
