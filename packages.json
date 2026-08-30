@@ -98,5 +98,15 @@
     "distribution": "trixie",
     "subdir": "vaultwarden-web-vault",
     "git_url": "https://github.com/astrapi/packages_debian.git"
+  },
+  {
+    "name": "vim-config",
+    "pkgver": "1.0.0",
+    "pkgrel": "1",
+    "pkgdesc": "Systemweite Vim-Konfiguration (deaktiviert Maus-Erfassung, damit Terminal-Textauswahl normal funktioniert)",
+    "arch": "all",
+    "distribution": "trixie",
+    "subdir": "vim-config",
+    "git_url": "https://github.com/astrapi/packages_debian.git"
   }
 ]
