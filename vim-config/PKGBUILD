@@ -1,0 +1,34 @@
+# Maintainer: Michael Otto <michael@astrapi.de>
+#
+# Reines Config-Bereitstellungs-Paket, kein eigener Programmcode oder
+# Rebuild: liefert nur eine Zeile systemweiter Vim-Konfiguration, die auf
+# allen PCs/LXCs identisch sein soll -- "set mouse-=a". Ohne das faengt
+# Vim per Default (mouse=a) Mausklicks/-drags fuer die eigene
+# Visual-Mode-Selektion ab, statt normale Terminal-Textauswahl (Markieren/
+# Kopieren per Maus) zuzulassen.
+#
+# /etc/vim/vimrc.local wird von /etc/vim/vimrc (aus dem vim-Paket selbst)
+# automatisch per "if filereadable(...) | source ... | endif" eingebunden
+# -- offizieller Debian-Vim-Hook fuer genau diesen Zweck (Admin-Overrides,
+# siehe /usr/share/doc/vim/README.Debian), kein Namenskonflikt wie bei
+# grml-zsh-config (E-012), da diese Datei bewusst dafuer vorgesehen ist.
+pkgname=vim-config
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Systemweite Vim-Konfiguration (deaktiviert Maus-Erfassung, damit Terminal-Textauswahl normal funktioniert)"
+arch=('all')
+distribution=trixie
+depends=('vim')
+makedepends=()
+source=()
+
+package() {
+    install -Dm644 /dev/null "${pkgdir}/etc/vim/vimrc.local"
+    cat > "${pkgdir}/etc/vim/vimrc.local" << 'EOF'
+" Von astrapi-packages verwaltet (vim-config) -- nicht von Hand aendern.
+" Verhindert, dass Vim per Default (mouse=a) Mausklicks/-drags fuer die
+" eigene Visual-Mode-Selektion abfaengt -- ohne das laesst sich Text im
+" Terminal nicht mehr normal per Maus markieren/kopieren.
+set mouse-=a
+EOF
+}
