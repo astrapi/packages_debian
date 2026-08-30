@@ -1,0 +1,66 @@
+# Maintainer: Michael Otto <michael@astrapi.de>
+#
+# CLI-Client + geteilte Sync-Engine fuer astrapi-sync, portiert aus dem
+# gleichnamigen packages_archlinux-Paket. Baut vom main-HEAD des
+# Monorepos astrapi-sync-linux (kein PyPI-Release) -- source_url zeigt
+# wie ueberall in diesem Repo auf packages_debian.git selbst, das
+# eigentliche Upstream-Repo wird in build() manuell geklont (kein
+# "source=()"-Aequivalent fuer Git-Quellen in dieser Pipeline, die
+# klont nur source_url selbst nach /build/src).
+#
+# pkgver ist statisch -- kein pkgver()-Aequivalent wie bei makepkg
+# unterstuetzt (_build_cmd() in astrapi_packages/modules/debian/jobs.py
+# liest nur die deklarierte Zeile), muss bei neuen astrapi-sync-linux-
+# Tags manuell nachgezogen werden, analog zum Arch-Pendant.
+pkgname=astrapi-sync-cli
+pkgver=26.8.2
+pkgrel=1
+pkgdesc="CLI-Client + geteilte Sync-Engine fuer astrapi-sync (Ordner-Synchronisation ueber mehrere eigene Geraete)"
+arch=('all')
+distribution=trixie
+depends=('python3' 'python3-httpx' 'python3-websockets' 'python3-watchdog')
+makedepends=()
+source=()
+
+# python3-venv (bringt pip via ensurepip mit -- kein System-pip im
+# Basis-Image) ist im custom Builder-Image vorinstalliert, siehe
+# astrapi_packages/modules/debian/dockerfiles/debian-builder-python.dockerfile
+# (urspruenglich fuer paperless-ngx angelegt, hier wiederverwendet).
+_builder_image=ctl/debian-builder-python
+_repo_url="https://github.com/astrapi/astrapi-sync-linux.git"
+
+build() {
+    git clone --quiet "${_repo_url}" upstream
+    cd upstream/astrapi-sync-cli
+
+    # python3-build/-installer/-wheel sind kein System-Paket im Builder-
+    # Image -- ueber ein Wegwerf-venv installiert, nur fuer diesen
+    # Bau-Schritt (das fertige Paket haengt zur Laufzeit ausschliesslich
+    # von den oben deklarierten depends= ab, nicht vom venv).
+    python3 -m venv /tmp/build-venv
+    /tmp/build-venv/bin/pip install --quiet build installer wheel setuptools
+    /tmp/build-venv/bin/python -m build --wheel --no-isolation
+}
+
+package() {
+    # package() laeuft in einer eigenen fakeroot-Subshell, kein
+    # automatisches "cd" aus build() -- siehe paperless-ngx/PKGBUILD.
+    cd upstream/astrapi-sync-cli
+
+    # "python -m installer" schreibt den Shebang generierter Konsolen-
+    # Skripte nach sys.executable des AUFRUFENDEN Interpreters (nicht
+    # nach dem Paket selbst) und installiert standardmaessig unter
+    # sys.prefix -- direkt mit dem Wegwerf-venv aufgerufen laege beides
+    # falsch (Shebang zeigt auf das gleich wieder verschwindende venv,
+    # Dateien landen unter dessen absolutem Pfad statt /usr/...).
+    # Deshalb System-python3 fuer den eigentlichen Install-Schritt,
+    # "installer" nur per PYTHONPATH aus dem venv importiert -- empirisch
+    # mit einem Mini-Testpaket verifiziert: ergibt korrekt
+    # /usr/bin/astrapi-sync-cli mit Shebang "#!/usr/bin/python3" und
+    # Dateien unter usr/lib/python3.*/site-packages/.
+    _site="$(/tmp/build-venv/bin/python -c 'import sysconfig; print(sysconfig.get_path("purelib"))')"
+    PYTHONPATH="$_site" python3 -m installer --destdir="${pkgdir}" dist/*.whl
+
+    install -Dm644 packaging/systemd/astrapi-sync-cli.service \
+        "${pkgdir}/usr/lib/systemd/user/astrapi-sync-cli.service"
+}
