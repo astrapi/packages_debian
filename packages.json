@@ -10,6 +10,16 @@
     "git_url": "https://github.com/astrapi/packages_debian.git"
   },
   {
+    "name": "astrapi-sync-cli",
+    "pkgver": "26.8.2",
+    "pkgrel": "1",
+    "pkgdesc": "CLI-Client + geteilte Sync-Engine fuer astrapi-sync (Ordner-Synchronisation ueber mehrere eigene Geraete)",
+    "arch": "all",
+    "distribution": "trixie",
+    "subdir": "astrapi-sync-cli",
+    "git_url": "https://github.com/astrapi/packages_debian.git"
+  },
+  {
     "name": "bookstack",
     "pkgver": "26.05.4",
     "pkgrel": "1",
