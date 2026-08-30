@@ -1,0 +1,18 @@
+# Maintainer: Michael Otto <michael@astrapi.de>
+#
+# Reines Meta-Paket, kein eigener Inhalt: buendelt die astrapi-
+# Standard-Baseline in einem Befehl statt "apt install grml-zsh-config
+# vim-config" jedes Mal einzeln zu tippen. Beide Abhaengigkeiten liegen
+# in diesem Repo.
+pkgname=astrapi-os
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Meta-Paket: astrapi-Standard-Baseline (grml-zsh-config, vim-config)"
+arch=('all')
+distribution=trixie
+depends=('grml-zsh-config' 'vim-config')
+source=()
+
+package() {
+    :
+}
