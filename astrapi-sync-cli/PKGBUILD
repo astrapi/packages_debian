@@ -43,9 +43,16 @@ build() {
 }
 
 package() {
-    # package() laeuft in einer eigenen fakeroot-Subshell, kein
-    # automatisches "cd" aus build() -- siehe paperless-ngx/PKGBUILD.
-    cd upstream/astrapi-sync-cli
+    # ANDERS als der Kommentar in anderen PKGBUILDs dieses Repos vermuten
+    # laesst: package() erbt das Arbeitsverzeichnis, in dem build() endete
+    # (die Pipeline setzt zwischen den Schritten kein "cd zurueck zu
+    # srcdir"), es startet NICHT bei srcdir selbst. Ein relatives
+    # "cd upstream/astrapi-sync-cli" waere hier doppelt verschachtelt
+    # (build() ist selbst schon dorthin gewechselt) -- deshalb absoluter
+    # Pfad ueber srcdir, empirisch am echten Server-Bau als Fehlerursache
+    # bestaetigt ("cd: upstream/astrapi-sync-cli: No such file or
+    # directory").
+    cd "${srcdir}/upstream/astrapi-sync-cli"
 
     # "python -m installer" schreibt den Shebang generierter Konsolen-
     # Skripte nach sys.executable des AUFRUFENDEN Interpreters (nicht
