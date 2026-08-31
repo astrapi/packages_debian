@@ -65,7 +65,19 @@ package() {
     # Skripte nach sys.executable des AUFRUFENDEN Interpreters und
     # installiert nach sys.prefix -- deshalb System-python3 fuer den
     # Install-Schritt, "installer" nur per PYTHONPATH aus dem Wegwerf-venv
-    # importiert (analog zu astrapi-sync-cli, dort verifiziert).
+    # importiert.
+    #
+    # WICHTIG (echt gegen einen Debian-trixie-Container verifiziert, nachdem
+    # das gebaute .deb auf einem echten LXC installiert war, systemd aber
+    # "Unable to locate executable '/usr/bin/astrapi-admin-agent'" meldete):
+    # Debians System-Python nutzt standardmaessig das sysconfig-Schema
+    # "posix_local" -- installiert ohne Weiteres nach /usr/local/bin bzw.
+    # /usr/local/lib/python3/dist-packages, NICHT nach /usr/bin. Ohne
+    # DEB_PYTHON_INSTALL_LAYOUT=deb_system (genau das, was dh_python3/
+    # pybuild intern setzen) landet die Konsolen-Datei am falschen Ort --
+    # die systemd-Unit (ExecStart=/usr/bin/astrapi-admin-agent) findet sie
+    # dann nicht, obwohl das Paket sie enthaelt.
+    export DEB_PYTHON_INSTALL_LAYOUT=deb_system
     _site="$(/tmp/build-venv/bin/python -c 'import sysconfig; print(sysconfig.get_path("purelib"))')"
     PYTHONPATH="$_site" python3 -m installer --destdir="${pkgdir}" dist/*.whl
 

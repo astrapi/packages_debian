@@ -66,10 +66,21 @@ package() {
     # falsch (Shebang zeigt auf das gleich wieder verschwindende venv,
     # Dateien landen unter dessen absolutem Pfad statt /usr/...).
     # Deshalb System-python3 fuer den eigentlichen Install-Schritt,
-    # "installer" nur per PYTHONPATH aus dem venv importiert -- empirisch
-    # mit einem Mini-Testpaket verifiziert: ergibt korrekt
-    # /usr/bin/astrapi-sync-cli mit Shebang "#!/usr/bin/python3" und
-    # Dateien unter usr/lib/python3.*/site-packages/.
+    # "installer" nur per PYTHONPATH aus dem venv importiert.
+    #
+    # KORREKTUR eines fruehreren, falschen Kommentars hier ("empirisch...
+    # ergibt korrekt /usr/bin/... und .../site-packages/"): das war
+    # offenbar auf einem Nicht-Debian-System getestet (Arch nennt sein
+    # Verzeichnis "site-packages", nie "dist-packages" -- ein echtes
+    # Debian-System haette diesen Unterschied sofort gezeigt). Echt gegen
+    # einen Debian-trixie-Container verifiziert (Anlass: astrapi-admin-
+    # agent liess sich auf einem echten LXC nicht starten, obwohl das
+    # .deb installiert war): Debians System-Python nutzt standardmaessig
+    # das sysconfig-Schema "posix_local" -- installiert ohne Weiteres nach
+    # /usr/local/bin bzw. /usr/local/lib/python3/dist-packages, NICHT nach
+    # /usr/bin. DEB_PYTHON_INSTALL_LAYOUT=deb_system (das dh_python3/
+    # pybuild intern setzen) erzwingt das korrekte Debian-Schema.
+    export DEB_PYTHON_INSTALL_LAYOUT=deb_system
     _site="$(/tmp/build-venv/bin/python -c 'import sysconfig; print(sysconfig.get_path("purelib"))')"
     PYTHONPATH="$_site" python3 -m installer --destdir="${pkgdir}" dist/*.whl
 
