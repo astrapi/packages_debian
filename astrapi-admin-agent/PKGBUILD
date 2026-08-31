@@ -27,9 +27,18 @@ source=()
 
 # python3-venv (bringt pip via ensurepip mit -- kein System-pip im
 # Basis-Image) ist im custom Builder-Image vorinstalliert, siehe
-# astrapi_packages/modules/debian/dockerfiles/debian-builder-python.dockerfile
-# (analog zu astrapi-sync-cli wiederverwendet).
-_builder_image=ctl/debian-builder-python
+# astrapi_packages/modules/debian/dockerfiles/debian-builder-python.dockerfile.
+# WICHTIG: sync_builder_image_from_pkgbuild() (astrapi_packages/modules/
+# builder/__init__.py) vergleicht diesen Wert gegen das *Label* des
+# registrierten Images (= die blosse Image-ID, siehe images_for_module():
+# label=img_id, value=f"ctl/{img_id}:{tag}") -- NICHT gegen den vollen
+# "ctl/<id>"-Namen. "ctl/debian-builder-python" (wie im Vorbild
+# astrapi-sync-cli-PKGBUILD) matcht deshalb nie, die Uebernahme schlaegt
+# still fehl (nur eine Log-Warnung) und das Item behaelt sein bisheriges
+# image-Feld -- am echten Server so beobachtet (Build lief mit dem
+# Default-Image ctl/debian-builder:latest, kein python3-venv -> Fehler
+# "ensurepip is not available"). Nur die bloße ID ist korrekt:
+_builder_image=debian-builder-python
 _repo_url="https://github.com/astrapi/astrapi-admin-agent.git"
 
 build() {

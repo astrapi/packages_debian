@@ -26,7 +26,12 @@ source=()
 # Basis-Image) ist im custom Builder-Image vorinstalliert, siehe
 # astrapi_packages/modules/debian/dockerfiles/debian-builder-python.dockerfile
 # (urspruenglich fuer paperless-ngx angelegt, hier wiederverwendet).
-_builder_image=ctl/debian-builder-python
+# sync_builder_image_from_pkgbuild() vergleicht diesen Wert gegen das
+# *Label* des registrierten Images (= die blosse Image-ID), nicht gegen
+# den vollen "ctl/<id>"-Namen -- "ctl/debian-builder-python" matchte nie
+# (still ignoriert, nur Log-Warnung). Am astrapi-admin-agent-Bau entdeckt
+# (Build lief mit dem Default-Image ohne python3-venv). Nur die bloße ID:
+_builder_image=debian-builder-python
 _repo_url="https://github.com/astrapi/astrapi-sync-linux.git"
 
 build() {
