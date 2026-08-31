@@ -1,7 +1,7 @@
 [
   {
     "name": "astrapi-admin-agent",
-    "pkgver": "26.8.4",
+    "pkgver": "26.8.5",
     "pkgrel": "1",
     "pkgdesc": "Linux-Agent fuer astrapi-admin (Policy-Durchsetzung: Pakete, Services, Config-Dateien)",
     "arch": "all",
