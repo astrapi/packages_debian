@@ -1,0 +1,67 @@
+# Maintainer: Michael Otto <michael@astrapi.de>
+#
+# Linux-Agent fuer astrapi-admin, portiert aus dem gleichnamigen
+# packages_archlinux-Paket. Baut vom main-HEAD des eigenstaendigen Repos
+# astrapi-admin-agent (kein PyPI-Release) -- source_url zeigt wie ueberall
+# in diesem Repo auf packages_debian.git selbst, das eigentliche
+# Upstream-Repo wird in build() manuell geklont.
+#
+# pkgver ist statisch -- kein pkgver()-Aequivalent wie bei makepkg
+# unterstuetzt (_build_cmd() in astrapi_packages/modules/debian/jobs.py
+# liest nur die deklarierte Zeile), muss bei neuen astrapi-admin-agent-
+# Tags manuell nachgezogen werden, analog zu astrapi-sync-cli.
+#
+# Anders als astrapi-sync-cli (systemd --user-Daemon): dieser Agent
+# braucht root (siehe astrapi_admin_agent.cli._require_root()) -- deshalb
+# ein SYSTEM-Service (kein User=) unter /usr/lib/systemd/system/, nicht
+# .../user/, plus der zugehoerige .timer fuers periodische apply.
+pkgname=astrapi-admin-agent
+pkgver=26.8.1
+pkgrel=1
+pkgdesc="Linux-Agent fuer astrapi-admin (Policy-Durchsetzung: Pakete, Services, Config-Dateien)"
+arch=('all')
+distribution=trixie
+depends=('python3' 'python3-httpx')
+makedepends=()
+source=()
+
+# python3-venv (bringt pip via ensurepip mit -- kein System-pip im
+# Basis-Image) ist im custom Builder-Image vorinstalliert, siehe
+# astrapi_packages/modules/debian/dockerfiles/debian-builder-python.dockerfile
+# (analog zu astrapi-sync-cli wiederverwendet).
+_builder_image=ctl/debian-builder-python
+_repo_url="https://github.com/astrapi/astrapi-admin-agent.git"
+
+build() {
+    git clone --quiet "${_repo_url}" upstream
+    cd upstream
+
+    # python3-build/-installer/-wheel sind kein System-Paket im Builder-
+    # Image -- ueber ein Wegwerf-venv installiert, nur fuer diesen
+    # Bau-Schritt (das fertige Paket haengt zur Laufzeit ausschliesslich
+    # von den oben deklarierten depends= ab, nicht vom venv).
+    python3 -m venv /tmp/build-venv
+    /tmp/build-venv/bin/pip install --quiet build installer wheel setuptools
+    /tmp/build-venv/bin/python -m build --wheel --no-isolation
+}
+
+package() {
+    # package() erbt das Arbeitsverzeichnis, in dem build() endete (siehe
+    # astrapi-sync-cli-PKGBUILD fuer die empirisch am echten Server-Bau
+    # gefundene Begruendung) -- absoluter Pfad ueber srcdir statt
+    # relativem "cd upstream".
+    cd "${srcdir}/upstream"
+
+    # "python -m installer" schreibt den Shebang generierter Konsolen-
+    # Skripte nach sys.executable des AUFRUFENDEN Interpreters und
+    # installiert nach sys.prefix -- deshalb System-python3 fuer den
+    # Install-Schritt, "installer" nur per PYTHONPATH aus dem Wegwerf-venv
+    # importiert (analog zu astrapi-sync-cli, dort verifiziert).
+    _site="$(/tmp/build-venv/bin/python -c 'import sysconfig; print(sysconfig.get_path("purelib"))')"
+    PYTHONPATH="$_site" python3 -m installer --destdir="${pkgdir}" dist/*.whl
+
+    install -Dm644 packaging/systemd/astrapi-admin-agent.service \
+        "${pkgdir}/usr/lib/systemd/system/astrapi-admin-agent.service"
+    install -Dm644 packaging/systemd/astrapi-admin-agent.timer \
+        "${pkgdir}/usr/lib/systemd/system/astrapi-admin-agent.timer"
+}

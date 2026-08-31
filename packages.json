@@ -1,5 +1,15 @@
 [
   {
+    "name": "astrapi-admin-agent",
+    "pkgver": "26.8.1",
+    "pkgrel": "1",
+    "pkgdesc": "Linux-Agent fuer astrapi-admin (Policy-Durchsetzung: Pakete, Services, Config-Dateien)",
+    "arch": "all",
+    "distribution": "trixie",
+    "subdir": "astrapi-admin-agent",
+    "git_url": "https://github.com/astrapi/packages_debian.git"
+  },
+  {
     "name": "astrapi-os",
     "pkgver": "1.0.0",
     "pkgrel": "1",
