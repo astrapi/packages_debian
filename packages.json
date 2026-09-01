@@ -91,7 +91,7 @@
   },
   {
     "name": "paperless-ngx",
-    "pkgver": "3.1.0",
+    "pkgver": "3.1.1",
     "pkgrel": "1",
     "pkgdesc": "A community-supported supercharged document management system: scan, index and archive all your physical documents",
     "arch": "amd64",
