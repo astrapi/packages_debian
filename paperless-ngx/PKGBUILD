@@ -92,7 +92,7 @@
 # automatisch bewahrt, kein manuelles Copy-Paste von Secrets noetig
 # (gleicher Mechanismus wie bookstacks .env, siehe E-007).
 pkgname=paperless-ngx
-pkgver=3.1.1
+pkgver=3.1.2
 pkgrel=1
 pkgdesc="A community-supported supercharged document management system: scan, index and archive all your physical documents"
 arch=('amd64')
@@ -132,7 +132,7 @@ depends=(
 makedepends=('python3-venv' 'python3-dev' 'libpq-dev' 'pkg-config')
 source=()
 
-_sha256="0f04ef84bbdc6914fa9863547f13e0a3ad13a26940c443b4c3fadbc3b581e102"
+_sha256="15a22c07dd9c8fd3d20c8eb7da2823df6e57c654d7d4de92e54988f9514230f2"
 _tarball="paperless-ngx-v${pkgver}.tar.xz"
 _url="https://github.com/paperless-ngx/paperless-ngx/releases/download/v${pkgver}/${_tarball}"
 

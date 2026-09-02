@@ -1,6 +1,6 @@
 # Maintainer: Michael Otto <michael@astrapi.de>
 pkgname=homepage
-pkgver=2.1.2
+pkgver=2.2.0
 pkgrel=1
 pkgdesc="A highly customizable homepage (or startpage) with Docker and service API integrations"
 # Nur amd64: der Debian-Builder baut auf einem einzelnen Host ohne
@@ -16,7 +16,7 @@ depends=('nodejs (>= 20.9)')
 optdepends=('docker: für Docker-Service-Discovery (User "homepage" muss der Gruppe "docker" beitreten, siehe homepage.service)')
 source=()
 
-_sha256="4f1d9796fd1bcf0f94620879a3ec0c54974b814638aa374ec4db17a19ef9b406"
+_sha256="c0d76213975f94555467a5db1fab3e2b6f35b5bdb1ef4b6a6e32e9b194f6e9cd"
 _tarball="${pkgname}-${pkgver}.tar.gz"
 _url="https://github.com/gethomepage/homepage/archive/refs/tags/v${pkgver}.tar.gz"
 
