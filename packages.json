@@ -72,7 +72,7 @@
   {
     "name": "homepage",
     "pkgver": "2.2.0",
-    "pkgrel": "1",
+    "pkgrel": "2",
     "pkgdesc": "A highly customizable homepage (or startpage) with Docker and service API integrations",
     "arch": "amd64",
     "distribution": "trixie",
