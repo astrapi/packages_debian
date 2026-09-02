@@ -1,7 +1,7 @@
 # Maintainer: Michael Otto <michael@astrapi.de>
 pkgname=homepage
 pkgver=2.2.0
-pkgrel=1
+pkgrel=2
 pkgdesc="A highly customizable homepage (or startpage) with Docker and service API integrations"
 # Nur amd64: der Debian-Builder baut auf einem einzelnen Host ohne
 # Cross-Arch-Toolchain, und unten wird ein konkretes linux-x64-Node.js
@@ -33,9 +33,14 @@ _url="https://github.com/gethomepage/homepage/archive/refs/tags/v${pkgver}.tar.g
 # TLS-Zertifikat von mirror.simpsons.lan ist intern signiert -- curl
 # braucht hier -k, genau wie apt in debian-builder.dockerfile
 # (Acquire::https::Verify-Peer "false" fuer denselben Host).
-_nodedeb="nodejs_24.19.0-1nodesource1_amd64.deb"
-_nodedeb_sha256="132518334c7b6a30cb77731ecd2951d59b7714d18f8e3ce6d970323b561a272d"
-_nodedeb_url="https://mirror.simpsons.lan/files/debian/node24x/pool/main/n/nodejs/${_nodedeb}"
+#
+# Version + SHA256 werden bewusst NICHT hier gepinnt, sondern erst in
+# build() zur Laufzeit aufgeloest: der Mirror haelt im Pool immer nur die
+# jeweils aktuellste NodeSource-Version vor, aeltere Dateien werden
+# geloescht (nicht nur aus dem Index entfernt) -- ein fester Pin brach
+# dadurch bei jedem Node-Update im Mirror mit 404 (siehe T-024-DEBIAN).
+_nodepool="https://mirror.simpsons.lan/files/debian/node24x/pool/main/n/nodejs/"
+_nodeindex="https://mirror.simpsons.lan/files/debian/node24x/dists/nodistro/main/binary-amd64/Packages.gz"
 
 # pnpm gibt es (Stand jetzt) nicht im internen Mirror -- Standalone-Binary
 # weiterhin direkt vom GitHub-Release, wie grml-zsh-config/
@@ -45,7 +50,21 @@ _pnpm_sha256="38949c3009bd674780ca7d652baa9e2310f5cda07ab9160b0e2a9c4934ab0def"
 _pnpm_url="https://github.com/pnpm/pnpm/releases/download/v${_pnpmver}/pnpm-linux-x64"
 
 build() {
-    curl -fsSLk --retry 3 --retry-delay 2 -o "${_nodedeb}" "${_nodedeb_url}"
+    # Aktuell im Mirror-Pool vorhandene nodejs-.deb ermitteln (dort liegt
+    # immer nur eine einzige Datei) und ihren SHA256 aus dem zugehoerigen
+    # Packages-Index nachschlagen -- siehe Kommentar oben.
+    local _nodedeb
+    _nodedeb=$(curl -fsSLk "${_nodepool}" | grep -oE 'nodejs_[0-9][^"]*_amd64\.deb' | head -n1)
+    [ -n "${_nodedeb}" ] || { echo "Kein nodejs-.deb im Mirror-Pool gefunden: ${_nodepool}" >&2; exit 1; }
+
+    local _nodedeb_sha256
+    _nodedeb_sha256=$(curl -fsSLk "${_nodeindex}" | gunzip -c | awk -v f="pool/main/n/nodejs/${_nodedeb}" '
+        $0 == "Filename: " f { hit=1 }
+        hit && /^SHA256: / { print $2; exit }
+    ')
+    [ -n "${_nodedeb_sha256}" ] || { echo "Kein SHA256 fuer ${_nodedeb} im Packages-Index gefunden" >&2; exit 1; }
+
+    curl -fsSLk --retry 3 --retry-delay 2 -o "${_nodedeb}" "${_nodepool}${_nodedeb}"
     echo "${_nodedeb_sha256}  ${_nodedeb}" | sha256sum -c -
     mkdir -p node-deb
     dpkg-deb -x "${_nodedeb}" node-deb
