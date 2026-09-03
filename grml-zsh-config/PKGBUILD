@@ -17,7 +17,7 @@
 # normale preinst/postrm-Skripte, die die Pipeline nachweislich
 # unveraendert uebernimmt (wie bei jedem anderen Paket hier).
 pkgname=grml-zsh-config
-pkgver=0.20.1
+pkgver=0.20.2
 pkgrel=1
 pkgdesc="grml's zsh setup"
 arch=('all')
@@ -28,7 +28,7 @@ depends=('zsh' 'coreutils' 'grep' 'sed' 'procps')
 makedepends=('curl')
 source=()
 
-_sha256="85a0339e8a3e110a73d580890dcdcc91ad70c161a4e29c2b04a25f53d6e6d52b"
+_sha256="bedea2550d5891f7817750394882ba84a6bbf07bd6bf45956b6fc8a76121d472"
 _tarball="grml-etc-core-${pkgver}.tar.gz"
 _url="https://github.com/grml/grml-etc-core/archive/refs/tags/v${pkgver}.tar.gz"
 

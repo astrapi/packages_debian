@@ -51,7 +51,7 @@
   },
   {
     "name": "grml-zsh-config",
-    "pkgver": "0.20.1",
+    "pkgver": "0.20.2",
     "pkgrel": "1",
     "pkgdesc": "grml's zsh setup",
     "arch": "all",
