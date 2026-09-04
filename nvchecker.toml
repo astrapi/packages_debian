@@ -5,12 +5,40 @@
 #
 # nvchecker meldet nur "es gibt Version X" -- das Anpassen der PKGBUILD
 # selbst (pkgver ersetzen, pkgrel zuruecksetzen) macht ein separates Skript.
-# Alle sieben Pakete laden bereits mit "${pkgver}" (statt hartkodiertem
-# String) von GitHub, ein reiner pkgver-Ersatz reicht deshalb ueberall aus.
+# Alle sieben "klassischen" Pakete laden bereits mit "${pkgver}" (statt
+# hartkodiertem String) von GitHub, ein reiner pkgver-Ersatz reicht
+# deshalb ueberall aus. astrapi-admin-agent/astrapi-sync-cli sind
+# anders: source=() ist leer, build() klont in beiden Faellen
+# bedingungslos den main-HEAD des jeweiligen Repos -- pkgver ist dort
+# rein informativ (kein Download-URL-Baustein), der Bump macht den
+# naechsten Bau trotzdem sinnvoll, weil main zum Zeitpunkt eines frischen
+# CalVer-Tags praktisch immer exakt dem Tag entspricht.
+#
+# astrapi-admin-agent/astrapi-sync-cli waren hier zunaechst bewusst
+# ausgeschlossen ("wir sind ja selbst der Upstream, wir wissen es
+# schon") -- Nutzerentscheidung 2026-09-04, umgekehrt: die pkgver-Bumps
+# wurden in der Praxis trotzdem vergessen (siehe astrapi-hub-Daily),
+# automatische Erkennung ist deshalb doch sinnvoller als die manuelle
+# Erinnerung.
 #
 # use_max_tag: Paket wird direkt aus einem Git-Tag-Archiv gebaut
 # (archive/refs/tags/...), kein eigentliches GitHub-"Release".
 # use_max_release: Paket laedt ein Release-Asset (releases/download/...).
+
+[astrapi-admin-agent]
+source = "github"
+github = "astrapi/astrapi-admin-agent"
+use_max_tag = true
+prefix = "v"
+
+[astrapi-sync-cli]
+# Paketname weicht vom echten Repo-Namen ab (astrapi-sync-linux) -- per
+# curl gegen die GitHub-API verifiziert, astrapi/astrapi-sync-cli
+# existiert nicht (404).
+source = "github"
+github = "astrapi/astrapi-sync-linux"
+use_max_tag = true
+prefix = "v"
 
 [bookstack]
 source = "github"
