@@ -16,7 +16,7 @@
 # ein SYSTEM-Service (kein User=) unter /usr/lib/systemd/system/, nicht
 # .../user/, plus der zugehoerige .timer fuers periodische apply.
 pkgname=astrapi-admin-agent
-pkgver=26.8.14
+pkgver=26.9.2
 pkgrel=1
 pkgdesc="Linux-Agent fuer astrapi-admin (Policy-Durchsetzung: Pakete, Services, Config-Dateien)"
 arch=('all')
