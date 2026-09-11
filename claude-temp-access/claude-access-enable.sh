@@ -19,7 +19,7 @@
 # SSH-Login, keine sudo-Rechte.
 set -euo pipefail
 
-DEFAULT_PUBKEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINa3mK1PYQ2rxGMWuvt5n3RzzPjJzouKarDBFGY1hslu claude-code-persistent-temp-access"
+DEFAULT_PUBKEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOvluku0SVjLZnMaU3ySEB4Qqb4uxyhnlTFOYhnU8ba6 claude@claude"
 
 if [[ $EUID -ne 0 ]]; then
     echo "Muss als root laufen (sudo)." >&2
