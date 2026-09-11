@@ -75,6 +75,16 @@ github = "paperless-ngx/paperless-ngx"
 use_max_release = true
 prefix = "v"
 
+[forgejo]
+# Auf Codeberg gehostet, nicht GitHub -- Codeberg laeuft selbst auf
+# Forgejo und teilt dessen API mit Gitea, "gitea"-Source + expliziter
+# host= deckt das ab (siehe nvchecker-Doku).
+source = "gitea"
+gitea = "forgejo/forgejo"
+host = "codeberg.org"
+use_max_tag = true
+prefix = "v"
+
 [vaultwarden-web-vault]
 source = "github"
 github = "dani-garcia/bw_web_builds"

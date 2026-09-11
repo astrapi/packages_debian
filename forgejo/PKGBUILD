@@ -1,0 +1,232 @@
+# Maintainer: Michael Otto <michael@astrapi.de>
+#
+# T-031-DEBIAN: Git-Hosting perspektivisch von GitHub weg auf einen
+# selbstgehosteten Forgejo-Server umziehen. Kein offizielles Debian-Paket
+# vorhanden (weder in den Archiven noch auf deb.griffo.io dauerhaft
+# kostenfrei ab 01.10.2026) -- offizieller Standardweg laut Forgejo-Doku
+# ist das einzelne Go-Binary von code.forgejo.org + GPG-Signatur/SHA256.
+# Dieses PKGBUILD laedt das Release-Binary + prueft SHA256 (gleiches
+# Vendoring-Prinzip wie bei paperless-ngx/bookstack: _sha256 statisch
+# gepinnt, check_upstream_updates.sh berechnet ihn bei einem pkgver-Bump
+# automatisch neu). Volle GPG-Signaturpruefung (Key
+# EB114F5E6C0DC2BCDD183550A4B61A2DC5923710 von keys.openpgp.org) bewusst
+# NICHT umgesetzt -- kein anderes Paket in diesem Repo macht das, und ein
+# Keyserver-Abruf im Builder waere ein zusaetzlicher externer
+# Netzwerk-Abhaengigkeitspunkt fuer wenig Mehrwert gegenueber dem bereits
+# gegen den offiziellen Release-Index gepruefeten SHA256.
+#
+# Binary liegt unter /usr/bin/forgejo statt des von der offiziellen Doku
+# vorgeschlagenen /usr/local/bin/forgejo -- Debian-Konvention dieses Repos
+# (siehe vaultwarden/miniserve): /usr/local ist fuer Admin-Handinstallation
+# reserviert, nicht fuer dpkg-verwaltete Dateien.
+#
+# Dedizierter Systemuser "git" (kein Home unter /home/git wie in der
+# offiziellen Doku, sondern --no-create-home --home /var/lib/forgejo,
+# gleiches Muster wie paperless-ngx/vaultwarden) -- WorkingDirectory und
+# HOME sind identisch, kein separates /home/git noetig.
+#
+# SSH: eigener, in Forgejo eingebauter SSH-Daemon auf Port 2222 (System-
+# sshd behaelt 22). Bewusst NICHT die Single-Port-Variante (ein
+# gemeinsamer Port 22 via AuthorizedKeysCommand in der System-sshd_config)
+# -- die waere invasiv (Paket muesste in eine Systemdatei ausserhalb
+# seines eigenen Bereichs eingreifen, schwer sauber rueckbaubar bei einer
+# Deinstallation). Nutzer klonen mit explizitem Port
+# (ssh://git@git.simpsons.lan:2222/...), Forgejo zeigt das automatisch so
+# in der Web-UI.
+#
+# Domain git.simpsons.lan (Nutzerentscheidung 2026-09-11), Caddy-Site
+# mitgeliefert -- gleiches Muster wie bookstack (E-008)/paperless-ngx
+# (E-009): TLS-Zertifikatpfad /etc/caddy/simpsons.lan.crt/.key.
+#
+# SQLite statt PostgreSQL/MySQL -- passt zur erwarteten Groesse (kein
+# separater DB-Server noetig), das offizielle Release-Binary bringt
+# SQLite-Unterstuetzung bereits eingebaut mit (kein System-libsqlite3
+# noetig).
+#
+# SECRET_KEY/INTERNAL_TOKEN werden in postinst per "forgejo generate
+# secret" erzeugt (forgejos eigener Generator statt selbstgebautem
+# Zufallswert wie bei paperless-ngx -- INTERNAL_TOKEN ist ein
+# JWT-Signierschluessel mit eigenem Format, kein beliebiger Zufalls-String).
+#
+# Registrierung bewusst deaktiviert (DISABLE_REGISTRATION=true) -- privater
+# Server, erster Admin-User wird manuell per "forgejo admin user create"
+# angelegt (siehe postinst-Hinweis), kein Default-Passwort im Paket.
+#
+# Noch offen (siehe T-031-DEBIAN/T-032-DEBIAN): Architektur/LXC-Platzierung,
+# Backup-Integration (SQLite-DB + Repository-Verzeichnis in
+# astrapi-backup), forgejo-runner (eigenes Paket, T-032-DEBIAN, setzt
+# dieses Paket voraus). Noch nicht real gebaut/verifiziert -- naechster
+# Schritt vor einem echten Deploy.
+pkgname=forgejo
+pkgver=16.0.4
+pkgrel=1
+pkgdesc="Self-hosted, lightweight Git-Forge (Forgejo) -- Release-Binary, SQLite, eigener SSH-Port 2222"
+arch=('amd64')
+distribution=trixie
+url="https://forgejo.org"
+license=('MIT')
+depends=('git' 'caddy')
+makedepends=()
+source=()
+
+_sha256="163c1d3dbe3666824438774303fd2d5cdaa11e481185899c173277ab59426afa"
+_bin="forgejo-${pkgver}-linux-amd64"
+_url="https://code.forgejo.org/forgejo/forgejo/releases/download/v${pkgver}/${_bin}"
+
+build() {
+    curl -fSL --retry 3 --retry-delay 2 -o "${_bin}" "${_url}"
+    echo "${_sha256}  ${_bin}" | sha256sum -c -
+    chmod +x "${_bin}"
+}
+
+package() {
+    install -Dm755 "${srcdir}/${_bin}" "${pkgdir}/usr/bin/forgejo"
+
+    install -d "${pkgdir}/etc/forgejo"
+    install -Dm640 /dev/null "${pkgdir}/etc/forgejo/app.ini"
+    cat <<'EOF' > "${pkgdir}/etc/forgejo/app.ini"
+APP_NAME = Forgejo
+RUN_MODE = prod
+RUN_USER = git
+
+[server]
+DOMAIN           = git.simpsons.lan
+ROOT_URL         = https://git.simpsons.lan/
+HTTP_ADDR        = 127.0.0.1
+HTTP_PORT        = 3000
+START_SSH_SERVER = true
+SSH_DOMAIN       = git.simpsons.lan
+SSH_PORT         = 2222
+SSH_LISTEN_PORT  = 2222
+
+[database]
+DB_TYPE = sqlite3
+PATH    = /var/lib/forgejo/forgejo.db
+
+[repository]
+ROOT = /var/lib/forgejo/repositories
+
+[security]
+INSTALL_LOCK   = true
+SECRET_KEY     = change-me
+INTERNAL_TOKEN = change-me
+
+[service]
+DISABLE_REGISTRATION = true
+EOF
+
+    install -d "${pkgdir}/usr/lib/systemd/system"
+    install -Dm644 /dev/null "${pkgdir}/usr/lib/systemd/system/forgejo.service"
+    cat <<'EOF' > "${pkgdir}/usr/lib/systemd/system/forgejo.service"
+[Unit]
+Description=Forgejo (Beyond coding. We forge.)
+After=syslog.target
+After=network.target
+
+[Service]
+RestartSec=2s
+Type=notify
+User=git
+Group=git
+WorkingDirectory=/var/lib/forgejo/
+ExecStart=/usr/bin/forgejo web --config /etc/forgejo/app.ini
+Restart=always
+Environment=USER=git HOME=/var/lib/forgejo FORGEJO_WORK_DIR=/var/lib/forgejo
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    chmod 644 "${pkgdir}/usr/lib/systemd/system/forgejo.service"
+
+    # Gleiches Muster wie bookstack (E-008)/paperless-ngx (E-009): fertige,
+    # paketverwaltete Caddy-Site-Datei statt Hand-Pflege in der Haupt-
+    # Caddyfile. Wird erst aktiv, sobald die Haupt-Caddyfile
+    # "import /etc/caddy/sites-enabled/*.caddy" enthaelt (siehe
+    # postinst-Hinweis).
+    install -Dm644 /dev/null "${pkgdir}/etc/caddy/sites-enabled/forgejo.caddy"
+    cat <<'EOF' > "${pkgdir}/etc/caddy/sites-enabled/forgejo.caddy"
+git.simpsons.lan {
+	reverse_proxy 127.0.0.1:3000
+	tls /etc/caddy/simpsons.lan.crt /etc/caddy/simpsons.lan.key
+}
+EOF
+
+    install -d "${pkgdir}/DEBIAN"
+
+    # app.ini + Caddy-Site als Conffiles -- laesst dpkg eine bei der
+    # Erstinstallation bereits vorhandene, nicht von dpkg verwaltete Datei
+    # an dieser Position unangetastet (falls spaeter von einer manuellen
+    # Forgejo-Installation migriert wird, gleiches Prinzip wie
+    # paperless.conf/bookstacks .env).
+    printf '/etc/forgejo/app.ini\n/etc/caddy/sites-enabled/forgejo.caddy\n' \
+        > "${pkgdir}/DEBIAN/conffiles"
+
+    cat > "${pkgdir}/DEBIAN/postinst" << 'EOF'
+#!/bin/sh
+set -e
+if ! getent passwd git >/dev/null; then
+    adduser --system --group --no-create-home --home /var/lib/forgejo \
+        --shell /usr/sbin/nologin git
+fi
+
+install -d -o git -g git -m 750 /var/lib/forgejo
+install -d -o git -g git -m 750 /var/lib/forgejo/repositories
+
+chown root:git /etc/forgejo
+chmod 750 /etc/forgejo
+chown git:git /etc/forgejo/app.ini
+chmod 640 /etc/forgejo/app.ini
+
+# [[:space:]]* vor "=" ist noetig, weil app.ini die Keys spaltenbuendig
+# ausrichtet (SECRET_KEY hat mehrere Leerzeichen Vorlauf, damit "="
+# unter INTERNAL_TOKENs "=" steht) -- ein Muster mit genau einem
+# Leerzeichen traf beim lokalen Verifizieren nur INTERNAL_TOKEN, bei
+# SECRET_KEY blieb "change-me" unbemerkt stehen.
+if grep -qE '^SECRET_KEY[[:space:]]*= change-me$' /etc/forgejo/app.ini; then
+    _secret=$(/usr/bin/forgejo generate secret SECRET_KEY)
+    sed -i -E "s/^SECRET_KEY[[:space:]]*= change-me\$/SECRET_KEY     = ${_secret}/" /etc/forgejo/app.ini
+fi
+if grep -qE '^INTERNAL_TOKEN[[:space:]]*= change-me$' /etc/forgejo/app.ini; then
+    _token=$(/usr/bin/forgejo generate secret INTERNAL_TOKEN)
+    sed -i -E "s/^INTERNAL_TOKEN[[:space:]]*= change-me\$/INTERNAL_TOKEN = ${_token}/" /etc/forgejo/app.ini
+fi
+
+systemctl daemon-reload 2>/dev/null || true
+systemctl reload caddy 2>/dev/null || true
+
+cat <<'MSG'
+forgejo installiert, aber noch nicht startklar:
+  1. Falls noch nicht vorhanden: TLS-Zertifikate unter
+     /etc/caddy/simpsons.lan.crt / .key bereitstellen
+  2. In der Haupt-/etc/caddy/Caddyfile einmalig ergaenzen (falls noch
+     nicht vorhanden):
+       import /etc/caddy/sites-enabled/*.caddy
+     danach: systemctl reload caddy
+  3. Dienst aktivieren:
+       systemctl enable --now forgejo
+  4. Ersten Admin-User anlegen (kein Default-Passwort im Paket):
+       sudo -u git /usr/bin/forgejo admin user create \
+         --config /etc/forgejo/app.ini --username <name> \
+         --password '<passwort>' --email <adresse> --admin
+  5. Git-Zugriff per SSH laeuft auf Port 2222 (System-sshd behaelt 22):
+       git clone ssh://git@git.simpsons.lan:2222/<user>/<repo>.git
+MSG
+EOF
+    chmod 755 "${pkgdir}/DEBIAN/postinst"
+
+    # WICHTIG (gleiche Fehlerklasse wie vaultwarden, E-005): "apt purge"/
+    # "dpkg --purge" loescht /var/lib/forgejo komplett -- das ist der
+    # gesamte Repository-Bestand + die SQLite-Datenbank. Auf einem Host
+    # mit echten Repos nie unbedacht ausfuehren, vorher Backup ziehen.
+    cat > "${pkgdir}/DEBIAN/postrm" << 'EOF'
+#!/bin/sh
+set -e
+if [ "$1" = "purge" ]; then
+    deluser --system git >/dev/null 2>&1 || true
+    rm -rf /var/lib/forgejo
+fi
+EOF
+    chmod 755 "${pkgdir}/DEBIAN/postrm"
+}
+
+# vim:set ts=2 sw=2 et:
