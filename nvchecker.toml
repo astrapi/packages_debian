@@ -85,6 +85,15 @@ host = "codeberg.org"
 use_max_tag = true
 prefix = "v"
 
+[forgejo-runner]
+# Gleiches Muster wie [forgejo]: auf Codeberg gehostet, eigenes Repo
+# forgejo/runner.
+source = "gitea"
+gitea = "forgejo/runner"
+host = "codeberg.org"
+use_max_tag = true
+prefix = "v"
+
 [vaultwarden-web-vault]
 source = "github"
 github = "dani-garcia/bw_web_builds"

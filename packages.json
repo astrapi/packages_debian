@@ -60,6 +60,16 @@
     "git_url": "https://github.com/astrapi/packages_debian.git"
   },
   {
+    "name": "forgejo-runner",
+    "pkgver": "13.1.0",
+    "pkgrel": "1",
+    "pkgdesc": "CI-Runner fuer Forgejo Actions (forgejo-runner) -- Release-Binary, Host-Execution-Modus ohne Docker",
+    "arch": "amd64",
+    "distribution": "trixie",
+    "subdir": "forgejo-runner",
+    "git_url": "https://github.com/astrapi/packages_debian.git"
+  },
+  {
     "name": "grml-zsh-config",
     "pkgver": "0.20.2",
     "pkgrel": "1",

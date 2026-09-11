@@ -1,0 +1,425 @@
+# Maintainer: Michael Otto <michael@astrapi.de>
+#
+# T-032-DEBIAN: CI-Runner-Gegenstueck zu forgejo (siehe dort/E-015 fuer
+# den vollen Kontext). Kein Debian-Paket vorhanden -- offizieller Weg ist
+# das einzelne Go-Release-Binary von code.forgejo.org, gleiches
+# SHA256-Vendoring-Prinzip wie beim forgejo-Paket selbst (kein
+# GPG-Keyserver-Abruf im Builder, siehe dortige Begruendung).
+#
+# Laeuft im **Host-Execution-Modus** (Label "self-hosted:host", kein
+# Docker/keine Container-Isolation auf diesem Host noetig) -- passt zu
+# unserem schlanken astrapi-*-Workflows (actions/checkout,
+# actions/setup-python, Build, Twine-Upload), kein Workflow-Schritt
+# verlangt aktuell ein Docker-Image.
+#
+# ACHTUNG (Upstream-Warnung, woertlich uebernommen): Host-Modus hat KEINE
+# Isolation -- ein einzelner Job kann den Host dauerhaft beschaedigen.
+# Nur fuer vertrauenswuerdige, selbst kontrollierte Workflows (unsere
+# eigenen astrapi-*-Repos) vertretbar, nicht fuer fremde/oeffentliche
+# Repos mit dieser Config nachbauen.
+#
+# nodejs als depends: JS-basierte Actions (u.a. actions/checkout selbst)
+# laufen im Host-Modus direkt mit dem System-node, da kein
+# Container-Image mehr die Laufzeit mitbringt (anders als im
+# Docker-Modus) -- ohne System-nodejs wuerde jeder Workflow mit
+# actions/checkout scheitern.
+#
+# config.yaml ist die UNVERAENDERTE Ausgabe von
+# "forgejo-runner generate-config" (v13.1.0, lokal erzeugt und
+# verifiziert) -- Upstream selbst sagt "it's safe to copy this as the
+# default config file without any modification", deshalb bewusst 1:1
+# uebernommen statt von Hand nachgebaut (Risiko von Tippfehlern/falschen
+# YAML-Schluesseln bei komplett selbst geschriebener Config). Einzige
+# Aenderung: "labels: []" -> "labels: [\"self-hosted:host\"]" (siehe
+# oben, Architekturentscheidung aus T-032-DEBIAN).
+#
+# Registrierung (server.connections in config.yaml: url/uuid/token pro
+# Forgejo-Instanz) bewusst NICHT automatisiert -- setzt einen bereits
+# laufenden forgejo-Server voraus (T-031-DEBIAN, noch nicht deployt) und
+# ein manuell in dessen Web-UI erzeugtes Token. Postinst gibt nur die
+# Anleitung aus, kein Platzhalter-Token im Paket.
+#
+# Dedizierter Systemuser "forgejo-runner" (NICHT der "git"-User aus dem
+# forgejo-Paket) -- Host-Modus fuehrt beliebigen Workflow-Code aus, ein
+# eigener, von den Forgejo-Repository-Daten getrennter Account begrenzt
+# den Schaden im Fall eines kompromittierten/fehlerhaften Jobs.
+pkgname=forgejo-runner
+pkgver=13.1.0
+pkgrel=1
+pkgdesc="CI-Runner fuer Forgejo Actions (forgejo-runner) -- Release-Binary, Host-Execution-Modus ohne Docker"
+arch=('amd64')
+distribution=trixie
+url="https://forgejo.org"
+license=('MIT')
+depends=('git' 'nodejs (>= 20)')
+makedepends=()
+source=()
+
+_sha256="29dae21e93f0eab5cdf3564008d44603c74770b41a4f4f1aceed172c774bc376"
+_bin="forgejo-runner-${pkgver}-linux-amd64"
+_url="https://code.forgejo.org/forgejo/runner/releases/download/v${pkgver}/${_bin}"
+
+build() {
+    curl -fSL --retry 3 --retry-delay 2 -o "${_bin}" "${_url}"
+    echo "${_sha256}  ${_bin}" | sha256sum -c -
+    chmod +x "${_bin}"
+}
+
+package() {
+    install -Dm755 "${srcdir}/${_bin}" "${pkgdir}/usr/bin/forgejo-runner"
+
+    install -d "${pkgdir}/etc/forgejo-runner"
+    install -Dm640 /dev/null "${pkgdir}/etc/forgejo-runner/config.yaml"
+    cat <<'EOF' > "${pkgdir}/etc/forgejo-runner/config.yaml"
+# Example configuration file, it's safe to copy this as the default config file without any modification.
+
+# You don't have to copy this file to your instance,
+# just run `forgejo-runner generate-config > config.yaml` to generate a config file.
+
+#
+# The value of level or job_level can be trace, debug, info, warn, error or fatal
+#
+log:
+  #
+  # What is displayed in the output of the runner process but not sent
+  # to the Forgejo instance.
+  #
+  level: info
+  #
+  # What is sent to the Forgejo instance and therefore
+  # visible in the web UI for a given job.
+  #
+  job_level: info
+
+runner:
+  # Where to store the registration result.
+  file: .runner
+  # Execute how many tasks concurrently at the same time.
+  capacity: 1
+  # Extra environment variables to run jobs.
+  envs:
+    A_TEST_ENV_NAME_1: a_test_env_value_1
+    A_TEST_ENV_NAME_2: a_test_env_value_2
+  # Extra environment variables to run jobs from a file.
+  # It will be ignored if it's empty or the file doesn't exist.
+  env_file: .env
+  # The timeout for a job to be finished.
+  # Please note that the Forgejo instance also has a timeout (3h by default) for the job.
+  # So the job could be stopped by the Forgejo instance if its timeout is shorter than this.
+  timeout: 3h
+  # The timeout for the runner to wait for running jobs to finish when
+  # shutting down because a TERM or INT signal has been received.  Any
+  # running jobs that haven't finished after this timeout will be
+  # canceled.
+  # If unset or zero, the jobs will be canceled immediately.
+  shutdown_timeout: 3h
+  # Whether skip verifying the TLS certificate of the instance.
+  insecure: false
+  # The timeout for fetching the job from the Forgejo instance.
+  fetch_timeout: 30s
+  # The interval for fetching the job from the Forgejo instance.
+  fetch_interval: 2s
+  # The interval for reporting the job status and logs to the Forgejo instance.
+  report_interval: 1s
+  # At the end of a job, retry configuration for sending logs to remote.
+  # report_retry:
+  #   # Maximum number of retry attempts.
+  #   max_retries: 10
+  #   # Initial delay between retries.  Delay between retries doubles up to `max_delay`.
+  #   initial_delay: 100ms
+  #   # Maximum delay between retries, defaults to 0, 0 is treated as no maximum.
+  #   max_delay: 0
+  # The labels of a runner are used to determine which jobs the runner can run and how to run them.
+  # Like: ["macos-arm64:host", "ubuntu-latest:docker://node:20-bookworm", "ubuntu-22.04:docker://node:20-bookworm"]
+  # If it's empty when registering, it will ask for inputting labels.
+  # If it's empty when executing the `daemon`, it will use labels in the `.runner` file.
+  #
+  # A docker label may carry options as a query string. `platform` sets the OS/architecture
+  # passed to the container runtime when pulling and creating images, which is useful on hosts
+  # (e.g. FreeBSD, macOS) that can run images for several platforms. The value must use the names
+  # Docker uses (the values accepted by `docker --platform`), e.g. linux/amd64, linux/arm64, linux/386:
+  #   labels: ["ubuntu-latest:docker://node:20-bookworm?platform=linux/amd64"]
+  #
+  # The same can be expressed with the more explicit mapping form:
+  #   labels:
+  #     freebsd-15:
+  #       backend: docker
+  #       backend-options:
+  #         image: ghcr.io/freebsd/freebsd-runtime:15.0
+  #         platform: freebsd/amd64
+  #
+  # astrapi: Host-Execution-Modus (kein Docker auf diesem Host), siehe
+  # T-032-DEBIAN -- einzige Abweichung von "forgejo-runner generate-config".
+  labels: ["self-hosted:host"]
+
+cache:
+  #
+  # When enabled, workflows will be given the ACTIONS_CACHE_URL environment variable
+  # used by the https://code.forgejo.org/actions/cache action. The server at this
+  # URL must implement a compliant REST API, and it must also be reachable from
+  # the container or host running the workflows.
+  #
+  # See also https://forgejo.org/docs/next/user/actions/advanced-features/#cache
+  #
+  # When it is not enabled, none of the following options apply.
+  #
+  # It works as follows:
+  #
+  # - the workflow is given a one-time use ACTIONS_CACHE_URL
+  # - a cache proxy listens to ACTIONS_CACHE_URL
+  # - the cache proxy securely communicates with the cache server using
+  #   a shared secret
+  #
+  enabled: true
+  #
+  #######################################################################
+  #
+  # Only used for the internal cache server.
+  #
+  # If external_server is not set, the Forgejo runner will spawn a
+  # cache server that will be used by the cache proxy.
+  #
+  #######################################################################
+  #
+  # The port being bound by the internal cache server.
+  # 0 means to use a random available port.
+  #
+  port: 0
+  #
+  # The directory to store the cache data.
+  #
+  # If empty, the cache data will be stored in $HOME/.cache/actcache.
+  #
+  dir: ""
+  #
+  #######################################################################
+  #
+  # Only used for the external cache server.
+  #
+  # If external_server is set, the internal cache server is not
+  # spawned.
+  #
+  #######################################################################
+  #
+  # The URL of the cache server. The URL should generally end with
+  # "/". The cache proxy will forward requests to the external
+  # server. The requests are authenticated with the "secret" that is
+  # shared with the external server.
+  #
+  external_server: ""
+  #
+  # The shared cache secret used to secure the communications between
+  # the cache proxy and the cache server.
+  #
+  # If empty, it will be generated to a new secret automatically when
+  # the server starts, and it will stay the same until it restarts.
+  #
+  # `secret` and `secret_url` are mutually exclusive.
+  #
+  secret: ""
+  #
+  # The secret for securing the cache can alternatively be loaded from a URL.
+  # Currently, only file URLs can be resolved. Example:
+  # `file:/path/to/secret.txt`.
+  #
+  # `secret_url` supports a single placeholder: `$CREDENTIALS_DIRECTORY`. If
+  # the environment variable `CREDENTIALS_DIRECTORY` exists, the placeholder is
+  # replaced with the value of `CREDENTIALS_DIRECTORY`. Otherwise, it is
+  # retained.
+  #
+  #  Example: file:$CREDENTIALS_DIRECTORY/secret.txt
+  #
+  # `secret` and `secret_url` are mutually exclusive.
+  #
+  secret_url: ""
+  #
+  #######################################################################
+  #
+  # Common to the internal and external cache server
+  #
+  #######################################################################
+  #
+  # The IP or hostname (195.84.20.30 or example.com) to use when constructing
+  # ACTIONS_CACHE_URL which is the URL of the cache proxy.
+  #
+  # If empty, it will be detected automatically.
+  #
+  # It may be impossible to figure out the host automatically if the containers
+  # or host running the workflows reside on a different network than the Forgejo
+  # runner. For example, if the Docker server used to create containers is not
+  # running on the same host as the Forgejo runner.
+  # In that case you can specify which IP or hostname to use to reach the
+  # internal cache server created by the Forgejo runner.
+  #
+  host: ""
+  #
+  # The port bound by the internal cache proxy.
+  # 0 means to use a random available port.
+  #
+  proxy_port: 0
+  #
+  # Overrides the ACTIONS_CACHE_URL variable passed to workflow
+  # containers. The URL should generally not end with "/". This should only
+  # be used if the runner host is not reachable from the workflow containers
+  # and requires further setup.
+  #
+  actions_cache_url_override: ""
+
+container:
+  # Specifies the network to which the container will connect.
+  # Could be `host`, `bridge` or the name of a custom network.
+  # If it's empty, create a network automatically.
+  network: ""
+  # Whether to create networks with IPv6 enabled. Requires the Docker daemon to be set up accordingly.
+  # Only takes effect if "network" is set to "".
+  enable_ipv6: false
+  # Whether to use privileged mode or not when launching task containers (privileged mode is required for Docker-in-Docker).
+  privileged: false
+  # And other options to be used when the container is started (e.g., --volume /etc/ssl/certs:/etc/ssl/certs:ro).
+  options:
+  # The parent directory of a job's working directory.
+  # If it's empty, /workspace will be used.
+  workdir_parent:
+  # Volumes (including bind mounts) can be mounted to containers. Glob syntax is supported, see https://github.com/gobwas/glob
+  # You can specify multiple volumes. If the sequence is empty, no volumes can be mounted.
+  # For example, if you only allow containers to mount the `data` volume and all the JSON files in `/src`, you should change the config to:
+  # valid_volumes:
+  #   - data
+  #   - /etc/ssl/certs
+  # If you want to allow any volume, please use the following configuration:
+  # valid_volumes:
+  #   - '**'
+  valid_volumes: []
+  # Overrides the docker host set by the DOCKER_HOST environment variable, and mounts on the job container.
+  # If "-" or "", no docker host will be mounted in the job container
+  # If "automount", an available docker host will automatically be found and mounted in the job container (e.g., /var/run/docker.sock).
+  # If it's a url, the specified docker host will be mounted in the job container
+  # Example urls: unix:///run/docker.socket or ssh://user@host
+  # The specified socket is mounted within the job container at /var/run/docker.sock
+  docker_host: "-"
+  # Pull docker image(s) even if already present
+  force_pull: false
+  # Rebuild local docker image(s) even if already present
+  force_rebuild: false
+
+host:
+  # The parent directory of a job's working directory.
+  # If it's empty, $HOME/.cache/act/ will be used.
+  workdir_parent:
+
+server:
+  # A map of connections to one or more Forgejo instances. Example:
+  #
+  # ```
+  # connections:
+  #   example:
+  #     url: https://example.com/
+  #     uuid: c9e50be9-a7c3-4aee-ba35-624c4ff8c519
+  #     token: 6634bb58be0db23cc013a2e72dd1828ae0257cf
+  #     fetch_interval: 30s
+  #   codeberg:
+  #     url: https://codeberg.org/
+  #     uuid: f543b661-cb02-4ba2-9820-108df62808b5
+  #     token_url: file:$CREDENTIALS_DIRECTORY/token.txt
+  #     labels:
+  #       - debian:docker://docker.io/library/node:lts-trixie
+  # ```
+  #
+  # The map's keys (`example`, and `codeberg` above) serve as the connections'
+  # names.
+  #
+  # The runner token can either be specified inline using `token` or be loaded
+  # from a file using `token_url`. The methods are mutually exclusive.
+  # `token_url` supports a single placeholder: `$CREDENTIALS_DIRECTORY`. If the
+  # environment variable `CREDENTIALS_DIRECTORY` exists, the placeholder is
+  # replaced with the value of `CREDENTIALS_DIRECTORY`. Otherwise, it is
+  # retained.
+  #
+  # Labels defined on a connection are limited to that particular connection.
+  # If a connection defines no labels, the labels declared by `runner.labels`
+  # are used instead.
+  #
+  # `fetch_interval` specifies how often Forgejo Runner should ask Forgejo for
+  # pending jobs. If `fetch_interval` is not defined on a connection,
+  # `runner.fetch_interval` is used. Note that Forgejo Runner might enforce a
+  # minimum value for certain instances like Codeberg.
+  #
+  # astrapi: hier nach dem echten Deploy von T-031-DEBIAN den
+  # astrapi-hub-Connection-Block ergaenzen (UUID/Token aus der
+  # Forgejo-Web-UI, siehe postinst-Hinweis) -- bewusst leer im Paket.
+  connections:
+EOF
+
+    install -d "${pkgdir}/usr/lib/systemd/system"
+    install -Dm644 /dev/null "${pkgdir}/usr/lib/systemd/system/forgejo-runner.service"
+    cat <<'EOF' > "${pkgdir}/usr/lib/systemd/system/forgejo-runner.service"
+[Unit]
+Description=Forgejo Actions Runner (Host-Execution-Modus, kein Docker)
+After=network.target
+
+[Service]
+User=forgejo-runner
+Group=forgejo-runner
+WorkingDirectory=/var/lib/forgejo-runner
+ExecStart=/usr/bin/forgejo-runner daemon --config /etc/forgejo-runner/config.yaml
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    chmod 644 "${pkgdir}/usr/lib/systemd/system/forgejo-runner.service"
+
+    install -d "${pkgdir}/DEBIAN"
+    printf '/etc/forgejo-runner/config.yaml\n' > "${pkgdir}/DEBIAN/conffiles"
+
+    cat > "${pkgdir}/DEBIAN/postinst" << 'EOF'
+#!/bin/sh
+set -e
+if ! getent passwd forgejo-runner >/dev/null; then
+    adduser --system --group --no-create-home --home /var/lib/forgejo-runner \
+        --shell /usr/sbin/nologin forgejo-runner
+fi
+
+install -d -o forgejo-runner -g forgejo-runner -m 750 /var/lib/forgejo-runner
+chown root:forgejo-runner /etc/forgejo-runner
+chmod 750 /etc/forgejo-runner
+chown forgejo-runner:forgejo-runner /etc/forgejo-runner/config.yaml
+chmod 640 /etc/forgejo-runner/config.yaml
+
+systemctl daemon-reload 2>/dev/null || true
+
+cat <<'MSG'
+forgejo-runner installiert, aber noch nicht registriert:
+  1. Voraussetzung: forgejo-Server (T-031-DEBIAN) laeuft bereits.
+  2. In der Forgejo-Web-UI einen neuen Runner anlegen (z.B.
+     https://git.simpsons.lan/-/admin/actions/runners fuer einen
+     instanzweiten Runner) -- ergibt eine UUID + ein Token.
+  3. In /etc/forgejo-runner/config.yaml unter "server: connections:"
+     einen Block ergaenzen:
+       connections:
+         astrapi-hub:
+           url: https://git.simpsons.lan/
+           uuid: <UUID aus der Web-UI>
+           token: <Token aus der Web-UI>
+  4. Dienst aktivieren:
+       systemctl enable --now forgejo-runner
+  WARNUNG: Dieser Runner laeuft im Host-Execution-Modus (Label
+  "self-hosted:host") -- KEINE Container-Isolation, ein Workflow-Schritt
+  laeuft direkt als forgejo-runner-User auf diesem Host. Nur fuer
+  vertrauenswuerdige, selbst kontrollierte Workflows verwenden.
+MSG
+EOF
+    chmod 755 "${pkgdir}/DEBIAN/postinst"
+
+    cat > "${pkgdir}/DEBIAN/postrm" << 'EOF'
+#!/bin/sh
+set -e
+if [ "$1" = "purge" ]; then
+    deluser --system forgejo-runner >/dev/null 2>&1 || true
+    rm -rf /var/lib/forgejo-runner
+fi
+EOF
+    chmod 755 "${pkgdir}/DEBIAN/postrm"
+}
+
+# vim:set ts=2 sw=2 et:
