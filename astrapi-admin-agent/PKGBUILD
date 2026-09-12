@@ -16,7 +16,7 @@
 # ein SYSTEM-Service (kein User=) unter /usr/lib/systemd/system/, nicht
 # .../user/, plus der zugehoerige .timer fuers periodische apply.
 pkgname=astrapi-admin-agent
-pkgver=26.9.7
+pkgver=26.9.8
 pkgrel=1
 pkgdesc="Linux-Agent fuer astrapi-admin (Policy-Durchsetzung: Pakete, Services, Config-Dateien)"
 arch=('all')
@@ -85,4 +85,10 @@ package() {
         "${pkgdir}/usr/lib/systemd/system/astrapi-admin-agent.service"
     install -Dm644 packaging/systemd/astrapi-admin-agent.timer \
         "${pkgdir}/usr/lib/systemd/system/astrapi-admin-agent.timer"
+    # T-322-ADMIN: "Jetzt pollen" aus astrapi-admin -- Socket-Aktivierung
+    # startet astrapi-admin-agent.service direkt, kein eigener Prozess.
+    install -Dm644 packaging/systemd/astrapi-admin-agent-trigger.socket \
+        "${pkgdir}/usr/lib/systemd/system/astrapi-admin-agent-trigger.socket"
+    install -Dm644 "packaging/systemd/astrapi-admin-agent-trigger@.service" \
+        "${pkgdir}/usr/lib/systemd/system/astrapi-admin-agent-trigger@.service"
 }
