@@ -75,6 +75,14 @@ github = "paperless-ngx/paperless-ngx"
 use_max_release = true
 prefix = "v"
 
+[claude-code]
+# Kein GitHub-Release -- downloads.claude.ai/claude-code-releases/latest
+# liefert die aktuelle Versionsnummer als reinen Klartext (kein JSON),
+# "regex"-Source mit Alles-Muster deckt das ab (siehe nvchecker-Doku).
+source = "regex"
+url = "https://downloads.claude.ai/claude-code-releases/latest"
+regex = "([\\d.]+)"
+
 [forgejo]
 # Auf Codeberg gehostet, nicht GitHub -- Codeberg laeuft selbst auf
 # Forgejo und teilt dessen API mit Gitea, "gitea"-Source + expliziter

@@ -1,0 +1,81 @@
+# Maintainer: Michael Otto <michael@astrapi.de>
+#
+# T-033-DEBIAN: Portierung des AUR-Pakets "claude-code"
+# (github.com/fabifont/claude-code-aur) nach Debian -- dasselbe
+# Vendoring-Prinzip wie bei allen anderen Binary-Release-Paketen in
+# diesem Repo (forgejo, miniserve, claude-temp-access), 1:1 vom
+# AUR-PKGBUILD uebernommen, nur der Debian-Bruecke angepasst.
+#
+# Release-Kanal: "latest" statt "stable"
+# (https://downloads.claude.ai/claude-code-releases/latest liefert nur
+# die Versionsnummer als Klartext) -- Nutzerentscheidung 2026-09-12,
+# passend zum AUR-Paket, das denselben Kanal trackt. "stable" waere zum
+# Vergleichszeitpunkt 2.1.236 gewesen, "latest" 2.1.269.
+#
+# Zwei Downloads in build(): das eigentliche Binary (SHA256-gepinnt,
+# offizielles Release-Manifest) und ein Legal/Lizenz-Markdown-Dokument
+# (kein SHA256 im AUR-Original, dort explizit "SKIP" -- reiner
+# Informationstext, keine Integritaetspruefung noetig).
+#
+# Installationslayout 1:1 vom AUR-Original uebernommen (nicht nur
+# Geschmackssache): Binary liegt unter /opt/claude-code/bin/claude,
+# /usr/bin/claude ist ein Wrapper, der DISABLE_UPDATES=1 und
+# DISABLE_INSTALLATION_CHECKS=1 setzt. Ohne den Wrapper wuerde
+# claude-code bei jedem Start warnen "claude command at
+# ~/.local/bin/claude missing or broken" (das Binary erwartet das
+# native Installer-Layout, kein Native-Install liegt hier aber vor) und
+# versuchen, sich selbst zu aktualisieren -- beides unerwuenscht fuer
+# ein per apt verwaltetes Paket.
+#
+# options=('!strip') im AUR-Original entfaellt hier ersatzlos: das
+# Binary ist ein self-contained Bun-Executable mit eingebetteten
+# JS-Ressourcen, Stripping wuerde es zerstoeren -- unsere
+# dpkg-deb-Bruecke ruft aber ohnehin nie einen Strip-Schritt auf
+# (kein dh_strip wie bei einem echten debhelper-Build), das Binary
+# bleibt also automatisch unangetastet.
+#
+# depends bewusst nur 'bash' (die Arch-optdepends git/github-cli/
+# glab/ripgrep/tmux/bubblewrap/socat sind alle optional, nicht als
+# harte depends uebernommen -- unsere Bruecke wertet optdepends=()
+# ohnehin nicht aus, siehe andere PKGBUILDs in diesem Repo).
+pkgname=claude-code
+pkgver=2.1.269
+pkgrel=1
+pkgdesc="An agentic coding tool that lives in your terminal"
+arch=('amd64')
+distribution=trixie
+url="https://github.com/anthropics/claude-code"
+license=('LicenseRef-claude-code')
+depends=('bash')
+makedepends=()
+source=()
+
+_sha256="25e44883f54419569a3d739f38cbbdaebe83b09895da0f343e1b003710a4775b"
+_bin="claude-${pkgver}-x86_64"
+_url="https://downloads.claude.ai/claude-code-releases/${pkgver}/linux-x64/claude"
+_legal_url="https://code.claude.com/docs/en/legal-and-compliance.md"
+
+build() {
+    curl -fSL --retry 3 --retry-delay 2 -o "${_bin}" "${_url}"
+    echo "${_sha256}  ${_bin}" | sha256sum -c -
+    chmod +x "${_bin}"
+
+    curl -fSL --retry 3 --retry-delay 2 -o cc-legal.md "${_legal_url}"
+}
+
+package() {
+    install -Dm755 "${srcdir}/${_bin}" "${pkgdir}/opt/claude-code/bin/claude"
+
+    install -d "${pkgdir}/usr/bin"
+    cat <<'EOF' > "${pkgdir}/usr/bin/claude"
+#!/bin/sh
+export DISABLE_UPDATES=1
+export DISABLE_INSTALLATION_CHECKS=1
+exec /opt/claude-code/bin/claude "$@"
+EOF
+    chmod 755 "${pkgdir}/usr/bin/claude"
+
+    install -Dm644 "${srcdir}/cc-legal.md" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}
+
+# vim:set ts=2 sw=2 et:

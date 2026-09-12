@@ -40,6 +40,16 @@
     "git_url": "https://github.com/astrapi/packages_debian.git"
   },
   {
+    "name": "claude-code",
+    "pkgver": "2.1.269",
+    "pkgrel": "1",
+    "pkgdesc": "An agentic coding tool that lives in your terminal",
+    "arch": "amd64",
+    "distribution": "trixie",
+    "subdir": "claude-code",
+    "git_url": "https://github.com/astrapi/packages_debian.git"
+  },
+  {
     "name": "claude-temp-access",
     "pkgver": "1.2.0",
     "pkgrel": "1",
