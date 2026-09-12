@@ -1,5 +1,39 @@
 # Maintainer: Michael Otto <michael@astrapi.de>
 #
+# pkgrel 2 (fuer 3.1.3 -- pkgrel wurde beim automatischen Versions-Bump
+# auf 3.1.3 durch check_upstream_updates.sh auf 1 zurueckgesetzt, die
+# "pkgrel N"-Kommentare weiter unten beziehen sich noch auf die
+# Nummerierung der vorherigen Version 3.0.5):
+# Standard-Port von 8000 auf 9999 geaendert. Grund: der
+# zentrale astrapi-admin-agent (laeuft auf jedem verwalteten Host,
+# u.a. auch dms.simpsons.lan) erzwingt per Policy eine einheitliche
+# Haupt-/etc/caddy/Caddyfile mit einem festen "reverse_proxy
+# 127.0.0.1:9999"-Catch-all -- das ueberschreibt bei jedem apply()-Lauf
+# (alle ~15 Min.) die Haupt-Caddyfile und ignoriert dabei jeden
+# Sites-Enabled-Import. Live auf dms.simpsons.lan aufgefallen (2026-09-12):
+# nach einem Routine-Update wurde die Haupt-Caddyfile so ueberschrieben,
+# paperless-ngx lief bereits nach ein-zwei apply()-Zyklen auf Port 8000
+# ins Leere, waehrend Caddy weiterhin gegen 9999 zeigte -- 502 fuer den
+# Nutzer. Statt die zentrale Policy bei jedem apply()-Lauf erneut zu
+# unterlaufen (Caddyfile haendisch zurueckschreiben, wird beim naechsten
+# Lauf wieder ueberschrieben), passt sich dieses Paket der Fleet-weiten
+# Konvention an: Webserver bindet jetzt direkt auf 9999, die eigene
+# Caddy-Site-Datei (sites-enabled/paperless-ngx.caddy) bleibt als
+# Fallback/Dokumentation erhalten, greift aber auf Hosts mit aktivem
+# astrapi-admin-agent ohnehin nicht (kein Import in der zentral
+# verwalteten Haupt-Caddyfile). Ursache der Policy selbst (warum
+# dms.simpsons.lan ueberhaupt vom generischen 9999-Muster erfasst wird)
+# liegt im astrapi-admin-Server, nicht in diesem Paket -- siehe
+# astrapi-hub-Vault fuer die eigentliche Policy-Korrektur.
+#
+# WICHTIG fuer bereits laufende Installationen: paperless.conf und die
+# Caddy-Site-Datei sind Conffiles -- ein Upgrade dieses Pakets aendert
+# den Port auf einer bestehenden Installation NICHT automatisch (der
+# alte, per Nutzer editierte Wert bleibt bestehen). Auf einem bereits
+# betroffenen Host muss "PAPERLESS_PORT=9999" manuell in
+# /opt/paperless/paperless.conf ergaenzt und
+# "systemctl restart paperless-webserver" ausgefuehrt werden.
+#
 # pkgrel 3: Bugfix, live auf dms.simpsons.lan nach einem Server-Neustart
 # aufgefallen -- paperless-webserver.service scheiterte mit "Address
 # already in use" auf Port 8000. Ursache: die mitgelieferte
@@ -93,7 +127,7 @@
 # (gleicher Mechanismus wie bookstacks .env, siehe E-007).
 pkgname=paperless-ngx
 pkgver=3.1.3
-pkgrel=1
+pkgrel=2
 pkgdesc="A community-supported supercharged document management system: scan, index and archive all your physical documents"
 arch=('amd64')
 distribution=trixie
@@ -281,7 +315,7 @@ WorkingDirectory=/opt/paperless/src
 EnvironmentFile=/opt/paperless/paperless.conf
 
 Environment=GRANIAN_HOST=::
-Environment=GRANIAN_PORT=8000
+Environment=GRANIAN_PORT=9999
 Environment=GRANIAN_WORKERS=1
 
 ExecStart=/bin/sh -c '\
@@ -363,7 +397,7 @@ EOF
     install -Dm644 /dev/null "${pkgdir}/etc/caddy/sites-enabled/paperless-ngx.caddy"
     cat <<'EOF' > "${pkgdir}/etc/caddy/sites-enabled/paperless-ngx.caddy"
 dms.simpsons.lan {
-	reverse_proxy 127.0.0.1:8000
+	reverse_proxy 127.0.0.1:9999
 	tls /etc/caddy/simpsons.lan.crt /etc/caddy/simpsons.lan.key
 }
 EOF
@@ -407,6 +441,43 @@ if grep -q '^PAPERLESS_SECRET_KEY=change-me$' /opt/paperless/paperless.conf; the
     sed -i "s/^PAPERLESS_SECRET_KEY=change-me\$/PAPERLESS_SECRET_KEY=${_key}/" /opt/paperless/paperless.conf
 fi
 
+# Automatische Migration bei jedem postinst-Lauf (Erstinstallation UND
+# Upgrade) -- Vorfall 2026-09-12: ein unbeaufsichtigtes "apt upgrade"
+# (3.0.5 -> 3.1.3) lief durch, aber ohne "manage.py migrate" -- die App
+# lief danach 500 Server Error ("column ... does not exist"), bis von
+# Hand nachmigriert wurde. Manuelles Nachholen bleibt fehleranfaellig
+# (leicht vergessen bei einem reinen "apt upgrade" ohne Blick auf
+# dieses Paket), daher jetzt automatisiert.
+#
+# "set -a; . paperless.conf; set +a" noetig, weil manage.py normalerweise
+# nur ueber systemd (EnvironmentFile=) an die Config kommt -- ein
+# direkter Aufruf sieht sie sonst nicht (siehe T-015-DEBIAN-Nachtrag,
+# PAPERLESS_SECRET_KEY waere sonst weiterhin "change-me" fuer diesen
+# Prozess).
+#
+# Nicht fatal bei Fehlschlag (kein "set -e"-Abbruch): bei einer
+# Erstinstallation existieren DB/Rolle typischerweise noch nicht (siehe
+# Hinweis Schritt 3 unten) -- migrate schlaegt dann erwartungsgemaess
+# fehl, keine Panik, nur eine klare Warnung statt eines automatischen
+# dpkg-Fehlschlags des gesamten Postinst.
+_paperless_manage_log=/var/log/paperless-ngx-postinst-migrate.log
+if sudo -u paperless bash -c '
+    set -a; . /opt/paperless/paperless.conf; set +a
+    exec /opt/paperless/venv/bin/python3 /opt/paperless/src/manage.py migrate --no-input
+' > "$_paperless_manage_log" 2>&1; then
+    echo "paperless-ngx: Datenbank-Migration erfolgreich (siehe $_paperless_manage_log)."
+    if sudo -u paperless bash -c '
+        set -a; . /opt/paperless/paperless.conf; set +a
+        exec /opt/paperless/venv/bin/python3 /opt/paperless/src/manage.py document_index reindex --if-needed
+    ' >> "$_paperless_manage_log" 2>&1; then
+        echo "paperless-ngx: Suchindex geprueft/aktualisiert (siehe $_paperless_manage_log)."
+    else
+        echo "paperless-ngx: WARNUNG -- Suchindex-Aktualisierung fehlgeschlagen, siehe $_paperless_manage_log"
+    fi
+else
+    echo "paperless-ngx: Migration (noch) nicht moeglich -- normal bei einer Erstinstallation, wenn DB/Rolle noch fehlen (siehe Log: $_paperless_manage_log). Nach dem Einrichten der Datenbank manuell nachholen, siehe Hinweis unten."
+fi
+
 # paperless-webserver.socket wurde in einer frueheren Paketversion
 # mitgeliefert, aber vom Service nie tatsaechlich per Socket-Activation
 # genutzt (granian bindet den Port selbst, ueber GRANIAN_PORT). Sobald
@@ -442,21 +513,27 @@ paperless-ngx installiert, aber noch nicht startklar:
      aelteren Configs oft nicht gesetzt
   3. PostgreSQL-Rolle + Datenbank anlegen (Name/User/Passwort aus
      /opt/paperless/paperless.conf), falls noch nicht vorhanden
-  4. Erstes Migrate:
-     sudo -u paperless /opt/paperless/venv/bin/python3 \
-       /opt/paperless/src/manage.py migrate
-  5. Volltextsuche-Index (Whoosh->Tantivy seit v3, baut sich bei
-     bare-metal-Installationen wie dieser NICHT automatisch neu auf):
-     sudo -u paperless /opt/paperless/venv/bin/python3 \
-       /opt/paperless/src/manage.py document_index reindex --if-needed
-  6. Falls von einer manuellen Installation migriert: alte, gleichnamige
+  4. Migration + Suchindex laufen seit pkgrel 2 AUTOMATISCH am Ende
+     dieses postinst (siehe Ausgabe oben, Log:
+     /var/log/paperless-ngx-postinst-migrate.log). War das noch nicht
+     moeglich (z.B. Erstinstallation, DB/Rolle fehlten noch bei
+     Schritt 3 oben), von Hand nachholen:
+     sudo -u paperless bash -c 'set -a; . /opt/paperless/paperless.conf; set +a; \
+       exec /opt/paperless/venv/bin/python3 /opt/paperless/src/manage.py migrate'
+     sudo -u paperless bash -c 'set -a; . /opt/paperless/paperless.conf; set +a; \
+       exec /opt/paperless/venv/bin/python3 /opt/paperless/src/manage.py document_index reindex --if-needed'
+  5. Falls von einer manuellen Installation migriert: alte, gleichnamige
      Units unter /etc/systemd/system/paperless-*.service pruefen und bei
      Bedarf entfernen (die haben Vorrang vor unseren unter
      /usr/lib/systemd/system/) -- dann "systemctl daemon-reload"
-  7. Dienste aktivieren:
+  6. Dienste aktivieren:
      systemctl enable --now paperless-webserver paperless-consumer \
        paperless-task-queue paperless-scheduler
-  8. Caddy-Site-Datei /etc/caddy/sites-enabled/paperless-ngx.caddy ist
+  7. Webserver bindet jetzt auf Port 9999 (nicht mehr 8000) -- angepasst
+     an die von astrapi-admin-agent fleet-weit erzwungene Haupt-Caddyfile
+     (reverse_proxy 127.0.0.1:9999), siehe Kommentar am Dateianfang.
+     Laeuft astrapi-admin-agent auf diesem Host NICHT, gilt weiterhin:
+     Caddy-Site-Datei /etc/caddy/sites-enabled/paperless-ngx.caddy ist
      angelegt, aber noch NICHT automatisch aktiv -- in der Haupt-
      /etc/caddy/Caddyfile einmalig ergaenzen (falls noch nicht
      vorhanden):
