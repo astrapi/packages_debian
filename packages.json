@@ -130,6 +130,16 @@
     "git_url": "https://github.com/astrapi/packages_debian.git"
   },
   {
+    "name": "simpsons-debian-base",
+    "pkgver": "1.0.0",
+    "pkgrel": "1",
+    "pkgdesc": "Grundausstattung fuer Debian-Server/LXCs -- Standardpakete erzwingen, nano entfernen",
+    "arch": "all",
+    "distribution": "trixie",
+    "subdir": "simpsons-debian-base",
+    "git_url": "https://github.com/astrapi/packages_debian.git"
+  },
+  {
     "name": "simpsons-keyring",
     "pkgver": "1.0.0",
     "pkgrel": "2",

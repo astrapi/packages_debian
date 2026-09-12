@@ -1,7 +1,8 @@
 # Upstream-Versions-Check fuer PKGBUILDs ohne eigenen Update-Mechanismus.
 #
 # Nicht enthalten und bewusst nicht noetig: claude-temp-access, helloworld,
-# simpsons-keyring -- interne Pakete ohne echtes Upstream.
+# simpsons-keyring, simpsons-debian-base -- interne Pakete ohne echtes
+# Upstream.
 #
 # nvchecker meldet nur "es gibt Version X" -- das Anpassen der PKGBUILD
 # selbst (pkgver ersetzen, pkgrel zuruecksetzen) macht ein separates Skript.

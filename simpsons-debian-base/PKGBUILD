@@ -1,0 +1,80 @@
+# Maintainer: Michael Otto <michael@astrapi.de>
+#
+# T-017-DEBIAN: Grundausstattung fuer jeden Debian-Server/LXC -- erzwingt
+# eine feste Paketliste (via depends) und entfernt gezielt unerwuenschte
+# Standardpakete (aktuell nur nano). Liste ist laut Nutzer noch nicht
+# final, waechst voraussichtlich weiter (2026-09-12).
+#
+# Reines Meta-/Konfigurationspaket ohne Build-Schritt, analog zu
+# simpsons-keyring.
+#
+# depends kann ein Paket nur ERZWINGEN, nicht entfernen -- dpkg hat dafuer
+# kein deklaratives Feld. Ein "Conflicts:"-Eintrag waere der Debian-
+# idiomatische Weg (apt loest das beim Dependency-Resolving selbst auf,
+# kein Nested-apt-Aufruf noetig), scheidet hier aber aus: die
+# Debian-Bau-Pipeline dieses Repos (astrapi_packages/modules/debian/jobs.py)
+# generiert DEBIAN/control ausschliesslich aus Package/Version/
+# Architecture/Maintainer/Description/Depends -- ein zusaetzliches
+# "Conflicts:"-Feld wuerde dabei stillschweigend verworfen (exakt dasselbe
+# Problem wie bei "replaces=()" in grml-zsh-config, siehe E-012).
+#
+# Deshalb bleibt nur die postinst-Route -- ABER: ein synchrones
+# "apt-get remove" INNERHALB von postinst waere selbst hochriskant: der
+# aeussere apt/dpkg-Prozess, der GERADE dieses Paket installiert, haelt
+# den dpkg-Datenbank-Lock (/var/lib/dpkg/lock) fuer die komplette Dauer
+# der Transaktion (Unpack+Configure ALLER beteiligten Pakete). Ein
+# verschachtelter apt-get-Aufruf aus postinst versucht, denselben
+# Lock erneut zu bekommen -- blockiert/schlaegt fehl ("Could not get
+# lock"), da flock() pro Dateideskriptor gilt und ein erneutes Oeffnen
+# durch den Kindprozess dagegen laeuft. Loesung: die eigentliche
+# Entfernung in einen vom aktuellen Prozessbaum abgekoppelten
+# Hintergrund-Prozess auslagern (setsid + Retry-Schleife), der erst
+# NACH Abschluss der aktuellen apt-Transaktion (wenn der Lock wieder
+# frei ist) tatsaechlich zuschlaegt. Nicht elegant, aber der uebliche
+# Workaround fuer genau diesen seltenen Fall.
+pkgname=simpsons-debian-base
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Grundausstattung fuer Debian-Server/LXCs -- Standardpakete erzwingen, nano entfernen"
+arch=('all')
+distribution=trixie
+depends=('zsh' 'grml-zsh-config' 'vim' 'vim-config' 'astrapi-admin-agent' 'claude-temp-access')
+makedepends=()
+source=()
+
+package() {
+    install -d "${pkgdir}/DEBIAN"
+
+    cat > "${pkgdir}/DEBIAN/postinst" << 'EOF'
+#!/bin/sh
+set -e
+
+# Siehe ausfuehrliche Begruendung am Kopf der PKGBUILD: kein
+# synchroner apt-get-Aufruf hier moeglich (dpkg-Lock-Deadlock), daher
+# entkoppelter Hintergrund-Prozess mit Retry-Schleife.
+if dpkg -l nano 2>/dev/null | grep -q '^ii'; then
+    setsid sh -c '
+        i=0
+        while [ "$i" -lt 30 ]; do
+            if DEBIAN_FRONTEND=noninteractive apt-get -y remove nano \
+                > /var/log/simpsons-debian-base-nano-removal.log 2>&1; then
+                exit 0
+            fi
+            i=$((i + 1))
+            sleep 2
+        done
+    ' < /dev/null > /dev/null 2>&1 &
+    # Kein "disown" -- das ist ein Bash-Builtin, postinst laeuft aber unter
+    # /bin/sh (auf Debian = dash), das kennt es nicht (mit "set -e" haette
+    # das den kompletten postinst-Lauf abgebrochen, Paket bliebe
+    # "nicht konfiguriert" haengen -- beim lokalen Testen gefunden). Nicht
+    # noetig: "setsid" hat den Hintergrund-Prozess bereits in eine eigene
+    # Session verschoben, er bekommt dadurch kein SIGHUP mehr, wenn die
+    # aktuelle Shell (postinst) endet.
+    echo "simpsons-debian-base: nano wird im Hintergrund entfernt, sobald die aktuelle apt-Transaktion abgeschlossen ist (Log: /var/log/simpsons-debian-base-nano-removal.log)."
+fi
+EOF
+    chmod 755 "${pkgdir}/DEBIAN/postinst"
+}
+
+# vim:set ts=2 sw=2 et:
