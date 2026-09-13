@@ -39,7 +39,7 @@
 # harte depends uebernommen -- unsere Bruecke wertet optdepends=()
 # ohnehin nicht aus, siehe andere PKGBUILDs in diesem Repo).
 pkgname=claude-code
-pkgver=2.1.269
+pkgver=2.1.270
 pkgrel=1
 pkgdesc="An agentic coding tool that lives in your terminal"
 arch=('amd64')
@@ -50,7 +50,7 @@ depends=('bash')
 makedepends=()
 source=()
 
-_sha256="25e44883f54419569a3d739f38cbbdaebe83b09895da0f343e1b003710a4775b"
+_sha256="3a624a5a7cd79bbad4d32bd7db36f1197ecf458bc5bf1e2aed81834a01ad3ef0"
 _bin="claude-${pkgver}-x86_64"
 _url="https://downloads.claude.ai/claude-code-releases/${pkgver}/linux-x64/claude"
 _legal_url="https://code.claude.com/docs/en/legal-and-compliance.md"

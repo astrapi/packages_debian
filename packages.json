@@ -41,7 +41,7 @@
   },
   {
     "name": "claude-code",
-    "pkgver": "2.1.269",
+    "pkgver": "2.1.270",
     "pkgrel": "1",
     "pkgdesc": "An agentic coding tool that lives in your terminal",
     "arch": "amd64",
