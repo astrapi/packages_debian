@@ -20,7 +20,7 @@
 # 1.37.0 (PR dani-garcia/vaultwarden#7434, das fehlerhafte Feld existiert
 # danach nicht mehr). MSRV bleibt bei genau 1.95.0, Image passt weiterhin.
 pkgname=vaultwarden
-pkgver=1.37.2
+pkgver=1.37.3
 pkgrel=1
 pkgdesc="An alternative Bitwarden server API implementation written in Rust"
 # Nur amd64: siehe homepage/PKGBUILD -- build_index.py kann ohnehin nur
@@ -31,7 +31,7 @@ depends=('libssl3t64' 'libsqlite3-0' 'vaultwarden-web-vault') # Erzwingt dein We
 makedepends=('cargo' 'rustc' 'pkg-config' 'libssl-dev' 'libsqlite3-dev')
 source=()
 
-_sha256="d607cc00066f7ea62b27a3c198e0259955fd5591adabccb8d3414d1f3d91ecd7"
+_sha256="64a3cd2117e82f226c01a9eb2d3a59b5629b527438d1f9cd0a85c9883c7a9b39"
 _tarball="${pkgname}-${pkgver}.tar.gz"
 _url="https://github.com/dani-garcia/vaultwarden/archive/refs/tags/${pkgver}.tar.gz"
 
