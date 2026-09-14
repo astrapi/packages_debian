@@ -62,8 +62,8 @@
   {
     "name": "forgejo",
     "pkgver": "16.0.4",
-    "pkgrel": "1",
-    "pkgdesc": "Self-hosted, lightweight Git-Forge (Forgejo) -- Release-Binary, SQLite, eigener SSH-Port 2222",
+    "pkgrel": "2",
+    "pkgdesc": "Self-hosted, lightweight Git-Forge (Forgejo) -- Release-Binary, SQLite, Git-SSH ueber System-sshd (Port 22)",
     "arch": "amd64",
     "distribution": "trixie",
     "subdir": "forgejo",

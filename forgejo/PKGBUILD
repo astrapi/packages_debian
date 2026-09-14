@@ -25,14 +25,37 @@
 # gleiches Muster wie paperless-ngx/vaultwarden) -- WorkingDirectory und
 # HOME sind identisch, kein separates /home/git noetig.
 #
-# SSH: eigener, in Forgejo eingebauter SSH-Daemon auf Port 2222 (System-
-# sshd behaelt 22). Bewusst NICHT die Single-Port-Variante (ein
-# gemeinsamer Port 22 via AuthorizedKeysCommand in der System-sshd_config)
-# -- die waere invasiv (Paket muesste in eine Systemdatei ausserhalb
-# seines eigenen Bereichs eingreifen, schwer sauber rueckbaubar bei einer
-# Deinstallation). Nutzer klonen mit explizitem Port
-# (ssh://git@git.simpsons.lan:2222/...), Forgejo zeigt das automatisch so
-# in der Web-UI.
+# pkgrel 2 (E-019, Kurskorrektur von E-015/T-031-DEBIAN nach echtem
+# Live-Test 2026-09-14): SSH laeuft jetzt ueber den System-sshd auf Port
+# 22 statt ueber einen eigenen, in Forgejo eingebauten SSH-Daemon auf
+# Port 2222. Grund fuer die Kehrtwende: beim echten Test war ein eigener
+# Port zwar funktional unproblematisch, aber Forgejos eigener
+# SSH-Server haette fuer Port 22 zusaetzlich CAP_NET_BIND_SERVICE
+# gebraucht (Port <1024, "git"-User ist nicht root) -- und Forgejo
+# selbst empfiehlt in der eigenen Doku (forgejo.org/docs/.../
+# recommendations/) ausdruecklich die OpenSSH-Variante als Standardweg.
+# START_SSH_SERVER=false, SSH_CREATE_AUTHORIZED_KEYS_FILE bleibt auf
+# dem Default (true) -- Forgejo schreibt/pflegt dadurch selbst eine
+# stinknormale $HOME/.ssh/authorized_keys mit command="forgejo serv
+# ..."-Praefix pro hinterlegtem Key, der bereits laufende System-sshd
+# braucht dafuer KEINE sshd_config-Anpassung (kein AuthorizedKeysCommand
+# noetig) -- passt zufaellig perfekt, weil der "git"-User-Home schon auf
+# /var/lib/forgejo zeigt (== $HOME der Unit), sshd erwartet dort per
+# Default genau .ssh/authorized_keys.
+#
+# ECHTER BUG dabei gefunden (live verifiziert, nicht nur theoretisch):
+# die Login-Shell des "git"-Users war /usr/sbin/nologin. sshd fuehrt
+# einen command=-erzwungenen Befehl als "$SHELL -c '<befehl>'" aus --
+# Debian/shadow-utils' nologin ignoriert dabei JEDES Argument und gibt
+# immer nur "This account is currently not available." aus, ganz gleich
+# was uebergeben wird. Symptom beim echten "git clone": "Schwerwiegend:
+# Protokollfehler: ungueltiges Zeichen fuer Zeilenlaenge: This" -- git
+# bekam die nologin-Textmeldung statt des Pack-Protokolls, weil
+# "forgejo serv ..." nie tatsaechlich ausgefuehrt wurde. Fix: Shell auf
+# /bin/bash geaendert (deckt sich mit der offiziellen Forgejo-Doku, die
+# genau dafuer /bin/bash statt nologin vorschlaegt). Bei
+# bereits existierenden Installationen wird die Shell in postinst aktiv
+# nachgezogen (siehe dort), nicht nur bei einer Neuanlage.
 #
 # Domain git.simpsons.lan (Nutzerentscheidung 2026-09-11), Caddy-Site
 # mitgeliefert -- gleiches Muster wie bookstack (E-008)/paperless-ngx
@@ -59,8 +82,8 @@
 # Schritt vor einem echten Deploy.
 pkgname=forgejo
 pkgver=16.0.4
-pkgrel=1
-pkgdesc="Self-hosted, lightweight Git-Forge (Forgejo) -- Release-Binary, SQLite, eigener SSH-Port 2222"
+pkgrel=2
+pkgdesc="Self-hosted, lightweight Git-Forge (Forgejo) -- Release-Binary, SQLite, Git-SSH ueber System-sshd (Port 22)"
 arch=('amd64')
 distribution=trixie
 url="https://forgejo.org"
@@ -94,10 +117,9 @@ DOMAIN           = git.simpsons.lan
 ROOT_URL         = https://git.simpsons.lan/
 HTTP_ADDR        = 127.0.0.1
 HTTP_PORT        = 3000
-START_SSH_SERVER = true
+START_SSH_SERVER = false
 SSH_DOMAIN       = git.simpsons.lan
-SSH_PORT         = 2222
-SSH_LISTEN_PORT  = 2222
+SSH_PORT         = 22
 
 [database]
 DB_TYPE = sqlite3
@@ -166,7 +188,15 @@ EOF
 set -e
 if ! getent passwd git >/dev/null; then
     adduser --system --group --no-create-home --home /var/lib/forgejo \
-        --shell /usr/sbin/nologin git
+        --shell /bin/bash git
+fi
+
+# Nachziehen fuer bereits existierende Installationen (pkgrel 1 legte den
+# User noch mit /usr/sbin/nologin an -- das bricht den SSH-command=-
+# Mechanismus des System-sshd, siehe Kommentar am Dateianfang). Nicht nur
+# bei einer Neuanlage, auch bei jedem Upgrade pruefen/korrigieren.
+if [ "$(getent passwd git | cut -d: -f7)" != "/bin/bash" ]; then
+    usermod -s /bin/bash git
 fi
 
 install -d -o git -g git -m 750 /var/lib/forgejo
@@ -208,8 +238,13 @@ forgejo installiert, aber noch nicht startklar:
        sudo -u git /usr/bin/forgejo admin user create \
          --config /etc/forgejo/app.ini --username <name> \
          --password '<passwort>' --email <adresse> --admin
-  5. Git-Zugriff per SSH laeuft auf Port 2222 (System-sshd behaelt 22):
-       git clone ssh://git@git.simpsons.lan:2222/<user>/<repo>.git
+  5. Git-Zugriff per SSH laeuft ueber den System-sshd auf Port 22 (kein
+     eigener Forgejo-SSH-Server mehr). Voraussetzung: mindestens ein
+     SSH-Key im Forgejo-Account hinterlegt (Weboberflaeche -> Einstellungen
+     -> SSH/GPG-Keys) -- Forgejo schreibt danach automatisch
+     /var/lib/forgejo/.ssh/authorized_keys neu, kein manueller Schritt
+     noetig:
+       git clone ssh://git@git.simpsons.lan/<user>/<repo>.git
 MSG
 EOF
     chmod 755 "${pkgdir}/DEBIAN/postinst"
