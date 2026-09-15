@@ -41,7 +41,7 @@
 # Conffile, aus demselben Grund (lokale Anpassungen sollen bei Upgrades
 # nicht klaglos ueberschrieben werden).
 pkgname=bookstack
-pkgver=26.05.4
+pkgver=26.05.5
 pkgrel=1
 pkgdesc="BookStack is a simple, self-hosted, easy-to-use platform for organising and storing information (wiki)"
 arch=('amd64')
@@ -65,7 +65,7 @@ depends=(
 makedepends=('php8.4-cli' 'composer' 'git')
 source=()
 
-_sha256="7ebe212958919f83c80b9c916541d9090896b8a9e990c4a7cde6a9af767cac29"
+_sha256="e7eacd0ba1be149d3a3015e28a68b0502989aac1c3cb8f1224e2dbadb3d16187"
 _tarball="bookstack-v${pkgver}.tar.gz"
 _url="https://github.com/BookStackApp/BookStack/archive/refs/tags/v${pkgver}.tar.gz"
 

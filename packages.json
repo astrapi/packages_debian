@@ -31,7 +31,7 @@
   },
   {
     "name": "bookstack",
-    "pkgver": "26.05.4",
+    "pkgver": "26.05.5",
     "pkgrel": "1",
     "pkgdesc": "BookStack is a simple, self-hosted, easy-to-use platform for organising and storing information (wiki)",
     "arch": "amd64",
@@ -41,7 +41,7 @@
   },
   {
     "name": "claude-code",
-    "pkgver": "2.1.270",
+    "pkgver": "2.1.272",
     "pkgrel": "1",
     "pkgdesc": "An agentic coding tool that lives in your terminal",
     "arch": "amd64",
