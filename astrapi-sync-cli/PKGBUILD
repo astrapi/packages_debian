@@ -14,7 +14,7 @@
 # Tags manuell nachgezogen werden, analog zum Arch-Pendant.
 pkgname=astrapi-sync-cli
 pkgver=26.8.2
-pkgrel=2
+pkgrel=3
 pkgdesc="CLI-Client + geteilte Sync-Engine fuer astrapi-sync (Ordner-Synchronisation ueber mehrere eigene Geraete)"
 arch=('all')
 distribution=trixie
@@ -84,6 +84,6 @@ package() {
     _site="$(/tmp/build-venv/bin/python -c 'import sysconfig; print(sysconfig.get_path("purelib"))')"
     PYTHONPATH="$_site" python3 -m installer --destdir="${pkgdir}" dist/*.whl
 
-    install -Dm644 packaging/systemd/astrapi-sync-cli.service \
-        "${pkgdir}/usr/lib/systemd/user/astrapi-sync-cli.service"
+    install -Dm644 packaging/systemd/astrapi-sync-cli@.service \
+        "${pkgdir}/usr/lib/systemd/system/astrapi-sync-cli@.service"
 }
