@@ -41,7 +41,7 @@
   },
   {
     "name": "claude-code",
-    "pkgver": "2.1.274",
+    "pkgver": "2.1.276",
     "pkgrel": "1",
     "pkgdesc": "An agentic coding tool that lives in your terminal",
     "arch": "amd64",
@@ -101,7 +101,7 @@
   },
   {
     "name": "homepage",
-    "pkgver": "2.3.0",
+    "pkgver": "2.4.0",
     "pkgrel": "1",
     "pkgdesc": "A highly customizable homepage (or startpage) with Docker and service API integrations",
     "arch": "amd64",
